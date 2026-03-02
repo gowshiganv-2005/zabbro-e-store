@@ -15,7 +15,14 @@ const API = {
 
         try {
             const res = await fetch(url, { ...options, headers });
-            const data = await res.json();
+            const contentType = res.headers.get('content-type') || '';
+            let data;
+            if (contentType.includes('application/json')) {
+                data = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error(res.ok ? text : `Server error (${res.status}): ${text.slice(0, 100)}`);
+            }
             if (!res.ok) throw new Error(data.message || 'Request failed');
             return data;
         } catch (err) {
