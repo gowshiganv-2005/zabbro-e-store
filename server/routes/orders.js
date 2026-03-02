@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { readExcel, findRow, findRows, appendRow, updateRow } = require('../utils/excel');
+const { sendOrderEmails } = require('../utils/email');
 const { v4: uuidv4 } = require('uuid');
 
 const ORDERS_FILE = 'orders.xlsx';
@@ -74,6 +75,13 @@ router.post('/', authenticate, (req, res) => {
         });
 
         res.status(201).json({ success: true, data: order, message: 'Order placed successfully' });
+
+        // Send confirmation emails (fire-and-forget, don't block response)
+        sendOrderEmails(order, products).then(result => {
+            console.log('📧 Email status:', JSON.stringify(result));
+        }).catch(err => {
+            console.error('📧 Email error:', err.message);
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to create order', error: error.message });
     }
