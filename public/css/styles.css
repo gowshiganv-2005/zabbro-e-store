@@ -2512,12 +2512,15 @@ hr {
 }
 
 .admin-card-body {
-  padding: 0
+  padding: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch
 }
 
 .admin-table {
   width: 100%;
-  border-collapse: collapse
+  border-collapse: collapse;
+  min-width: 500px
 }
 
 .admin-table th {
@@ -2541,6 +2544,12 @@ hr {
 
 .admin-table tr:hover td {
   background: var(--glass)
+}
+
+.admin-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px
 }
 
 .status-badge {
@@ -2969,18 +2978,91 @@ hr {
     gap: 32px
   }
 
+  /* ── Admin Mobile ── */
+  .admin-page {
+    padding: 16px 0 48px
+  }
+
+  .admin-header {
+    margin-bottom: 16px
+  }
+
+  .admin-header h1 {
+    font-size: 1.375rem
+  }
+
   .admin-tabs {
     gap: 2px;
-    padding: 3px
+    padding: 3px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch
+  }
+
+  .admin-tabs::-webkit-scrollbar {
+    display: none
   }
 
   .admin-tab {
     padding: 8px 14px;
-    font-size: .75rem
+    font-size: .75rem;
+    flex-shrink: 0
   }
 
   .stats-grid {
-    grid-template-columns: 1fr 1fr
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px
+  }
+
+  .stat-card {
+    padding: 16px
+  }
+
+  .stat-value {
+    font-size: 1.25rem
+  }
+
+  .stat-label {
+    font-size: .6875rem
+  }
+
+  .admin-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 16px
+  }
+
+  .admin-card {
+    margin-bottom: 16px;
+    border-radius: 12px
+  }
+
+  .admin-card-header {
+    padding: 14px 16px
+  }
+
+  .admin-card-header h3 {
+    font-size: .9375rem
+  }
+
+  .admin-card-body {
+    overflow-x: auto
+  }
+
+  .admin-table {
+    min-width: 500px
+  }
+
+  .admin-table th {
+    padding: 10px 14px;
+    font-size: .6875rem
+  }
+
+  .admin-table td {
+    padding: 10px 14px;
+    font-size: .8125rem
   }
 
   .reviews-summary {

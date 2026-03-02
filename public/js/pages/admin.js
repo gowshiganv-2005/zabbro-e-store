@@ -62,7 +62,7 @@ async function loadOverviewTab(el) {
       <div class="stat-card"><div class="stat-label">Products</div><div class="stat-value">${d.overview.totalProducts}</div><div class="stat-change ${d.lowStockItems > 0 ? 'down' : 'up'}">${d.lowStockItems} low stock</div></div>
       <div class="stat-card"><div class="stat-label">Customers</div><div class="stat-value">${d.overview.totalUsers}</div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="admin-grid-2">
       <div class="admin-card">
         <div class="admin-card-header"><h3>Recent Orders</h3></div>
         <div class="admin-card-body">
