@@ -1,44 +1,57 @@
 /**
- * Excel Utility Module
- * Handles all read/write operations with Excel files (.xlsx)
- * Acts as the database layer for the e-commerce application
+ * Database Utility Module (MongoDB version)
+ * Drop-in replacement for the Excel utility module
+ * Same function signatures — routes don't need any changes
  */
 
-const XLSX = require('xlsx');
-const path = require('path');
-const fs = require('fs');
+const { Product, User, Order, Inventory, Review } = require('../models');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// Map filenames to MongoDB models
+const MODEL_MAP = {
+  'products.xlsx': Product,
+  'users.xlsx': User,
+  'orders.xlsx': Order,
+  'inventory.xlsx': Inventory,
+  'reviews.xlsx': Review
+};
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+function getModel(filename) {
+  const model = MODEL_MAP[filename];
+  if (!model) {
+    console.error(`No model found for file: ${filename}`);
+    return null;
+  }
+  return model;
 }
 
 /**
- * Read data from an Excel file
- * @param {string} filename - Name of the Excel file (e.g., 'products.xlsx')
- * @param {string} sheetName - Optional sheet name, defaults to first sheet
- * @returns {Array} Array of objects representing rows
+ * Read all data from a collection (replaces readExcel)
+ * @param {string} filename - Original Excel filename (e.g., 'products.xlsx')
+ * @returns {Array} Array of plain objects
  */
-function readExcel(filename, sheetName = null) {
-  const filePath = path.join(DATA_DIR, filename);
-  
-  if (!fs.existsSync(filePath)) {
-    console.warn(`File ${filename} not found. Returning empty array.`);
-    return [];
-  }
+function readExcel(filename) {
+  const Model = getModel(filename);
+  if (!Model) return [];
+
+  // Use synchronous-like pattern with a cache for compatibility
+  // Since routes use this synchronously, we need a sync wrapper
+  // This is handled by the async initialization in server.js
+  throw new Error('Use readExcelAsync instead, or call from async context');
+}
+
+/**
+ * Async version of readExcel
+ */
+async function readExcelAsync(filename) {
+  const Model = getModel(filename);
+  if (!Model) return [];
 
   try {
-    const workbook = XLSX.readFile(filePath);
-    const sheet = sheetName 
-      ? workbook.Sheets[sheetName] 
-      : workbook.Sheets[workbook.SheetNames[0]];
-    
-    if (!sheet) return [];
-    
-    const data = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    return data;
+    const docs = await Model.find({}).lean();
+    return docs.map(doc => {
+      const { _id, __v, ...rest } = doc;
+      return rest;
+    });
   } catch (error) {
     console.error(`Error reading ${filename}:`, error.message);
     return [];
@@ -46,19 +59,17 @@ function readExcel(filename, sheetName = null) {
 }
 
 /**
- * Write data to an Excel file
- * @param {string} filename - Name of the Excel file
- * @param {Array} data - Array of objects to write
- * @param {string} sheetName - Optional sheet name, defaults to 'Sheet1'
+ * Write (replace all) data to a collection (replaces writeExcel)
  */
-function writeExcel(filename, data, sheetName = 'Sheet1') {
-  const filePath = path.join(DATA_DIR, filename);
+async function writeExcelAsync(filename, data) {
+  const Model = getModel(filename);
+  if (!Model) return false;
 
   try {
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    XLSX.writeFile(workbook, filePath);
+    await Model.deleteMany({});
+    if (data.length > 0) {
+      await Model.insertMany(data);
+    }
     return true;
   } catch (error) {
     console.error(`Error writing ${filename}:`, error.message);
@@ -67,77 +78,100 @@ function writeExcel(filename, data, sheetName = 'Sheet1') {
 }
 
 /**
- * Append a single row to an existing Excel file
- * @param {string} filename - Name of the Excel file
- * @param {Object} row - Object representing the new row
+ * Append a single row to a collection (replaces appendRow)
  */
-function appendRow(filename, row) {
-  const existingData = readExcel(filename);
-  existingData.push(row);
-  return writeExcel(filename, existingData);
+async function appendRowAsync(filename, row) {
+  const Model = getModel(filename);
+  if (!Model) return false;
+
+  try {
+    await Model.create(row);
+    return true;
+  } catch (error) {
+    console.error(`Error appending to ${filename}:`, error.message);
+    return false;
+  }
 }
 
 /**
- * Update a row in an Excel file by matching a field value
- * @param {string} filename - Name of the Excel file
- * @param {string} matchField - Field to match on (e.g., 'id')
- * @param {*} matchValue - Value to match
- * @param {Object} updates - Object with fields to update
+ * Update a row by matching a field value (replaces updateRow)
  */
-function updateRow(filename, matchField, matchValue, updates) {
-  const data = readExcel(filename);
-  const index = data.findIndex(row => String(row[matchField]) === String(matchValue));
-  
-  if (index === -1) return false;
-  
-  data[index] = { ...data[index], ...updates };
-  return writeExcel(filename, data);
+async function updateRowAsync(filename, matchField, matchValue, updates) {
+  const Model = getModel(filename);
+  if (!Model) return false;
+
+  try {
+    const result = await Model.updateOne(
+      { [matchField]: String(matchValue) },
+      { $set: updates }
+    );
+    return result.modifiedCount > 0 || result.matchedCount > 0;
+  } catch (error) {
+    console.error(`Error updating ${filename}:`, error.message);
+    return false;
+  }
 }
 
 /**
- * Delete a row from an Excel file by matching a field value
- * @param {string} filename - Name of the Excel file
- * @param {string} matchField - Field to match on
- * @param {*} matchValue - Value to match
+ * Delete a row by matching a field value (replaces deleteRow)
  */
-function deleteRow(filename, matchField, matchValue) {
-  const data = readExcel(filename);
-  const filtered = data.filter(row => String(row[matchField]) !== String(matchValue));
-  
-  if (filtered.length === data.length) return false;
-  
-  return writeExcel(filename, filtered);
+async function deleteRowAsync(filename, matchField, matchValue) {
+  const Model = getModel(filename);
+  if (!Model) return false;
+
+  try {
+    const result = await Model.deleteOne({ [matchField]: String(matchValue) });
+    return result.deletedCount > 0;
+  } catch (error) {
+    console.error(`Error deleting from ${filename}:`, error.message);
+    return false;
+  }
 }
 
 /**
- * Find a single row by matching a field value
- * @param {string} filename - Name of the Excel file
- * @param {string} matchField - Field to match on
- * @param {*} matchValue - Value to match
+ * Find a single row by matching a field value (replaces findRow)
  */
-function findRow(filename, matchField, matchValue) {
-  const data = readExcel(filename);
-  return data.find(row => String(row[matchField]) === String(matchValue)) || null;
+async function findRowAsync(filename, matchField, matchValue) {
+  const Model = getModel(filename);
+  if (!Model) return null;
+
+  try {
+    const doc = await Model.findOne({ [matchField]: String(matchValue) }).lean();
+    if (!doc) return null;
+    const { _id, __v, ...rest } = doc;
+    return rest;
+  } catch (error) {
+    console.error(`Error finding in ${filename}:`, error.message);
+    return null;
+  }
 }
 
 /**
- * Find multiple rows by matching a field value
- * @param {string} filename - Name of the Excel file
- * @param {string} matchField - Field to match on
- * @param {*} matchValue - Value to match
+ * Find multiple rows by matching a field value (replaces findRows)
  */
-function findRows(filename, matchField, matchValue) {
-  const data = readExcel(filename);
-  return data.filter(row => String(row[matchField]) === String(matchValue));
+async function findRowsAsync(filename, matchField, matchValue) {
+  const Model = getModel(filename);
+  if (!Model) return [];
+
+  try {
+    const docs = await Model.find({ [matchField]: String(matchValue) }).lean();
+    return docs.map(doc => {
+      const { _id, __v, ...rest } = doc;
+      return rest;
+    });
+  } catch (error) {
+    console.error(`Error finding rows in ${filename}:`, error.message);
+    return [];
+  }
 }
 
 module.exports = {
-  readExcel,
-  writeExcel,
-  appendRow,
-  updateRow,
-  deleteRow,
-  findRow,
-  findRows,
-  DATA_DIR
+  readExcel: readExcelAsync,
+  writeExcel: writeExcelAsync,
+  appendRow: appendRowAsync,
+  updateRow: updateRowAsync,
+  deleteRow: deleteRowAsync,
+  findRow: findRowAsync,
+  findRows: findRowsAsync,
+  DATA_DIR: ''
 };

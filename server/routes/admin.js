@@ -59,12 +59,12 @@ function adminAuth(req, res, next) {
 }
 
 // GET /api/admin/dashboard - Get dashboard statistics
-router.get('/dashboard', adminAuth, (req, res) => {
+router.get('/dashboard', adminAuth, async (req, res) => {
     try {
-        const products = readExcel('products.xlsx');
-        const users = readExcel('users.xlsx');
-        const orders = readExcel('orders.xlsx');
-        const inventory = readExcel('inventory.xlsx');
+        const products = await readExcel('products.xlsx');
+        const users = await readExcel('users.xlsx');
+        const orders = await readExcel('orders.xlsx');
+        const inventory = await readExcel('inventory.xlsx');
 
         const totalRevenue = orders.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0);
         const thisMonth = orders.filter(o => {
@@ -142,9 +142,9 @@ router.get('/dashboard', adminAuth, (req, res) => {
 });
 
 // GET /api/admin/inventory - Get full inventory
-router.get('/inventory', adminAuth, (req, res) => {
+router.get('/inventory', adminAuth, async (req, res) => {
     try {
-        const inventory = readExcel('inventory.xlsx');
+        const inventory = await readExcel('inventory.xlsx');
         res.json({ success: true, data: inventory });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch inventory' });
@@ -152,7 +152,7 @@ router.get('/inventory', adminAuth, (req, res) => {
 });
 
 // PUT /api/admin/inventory/:productId - Update inventory
-router.put('/inventory/:productId', adminAuth, (req, res) => {
+router.put('/inventory/:productId', adminAuth, async (req, res) => {
     try {
         const { currentStock, reorderLevel, reorderQuantity } = req.body;
         const updates = {};
@@ -164,12 +164,12 @@ router.put('/inventory/:productId', adminAuth, (req, res) => {
             updates.lastRestocked = new Date().toISOString();
 
             // Also update product stock
-            updateRow('products.xlsx', 'id', req.params.productId, { stock: parseInt(currentStock) });
+            await updateRow('products.xlsx', 'id', req.params.productId, { stock: parseInt(currentStock) });
         }
         if (reorderLevel !== undefined) updates.reorderLevel = parseInt(reorderLevel);
         if (reorderQuantity !== undefined) updates.reorderQuantity = parseInt(reorderQuantity);
 
-        updateRow('inventory.xlsx', 'productId', req.params.productId, updates);
+        await updateRow('inventory.xlsx', 'productId', req.params.productId, updates);
         res.json({ success: true, message: 'Inventory updated successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to update inventory' });
@@ -186,35 +186,6 @@ router.post('/upload', adminAuth, upload.single('image'), (req, res) => {
         res.json({ success: true, data: { url: imageUrl }, message: 'Image uploaded successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to upload image' });
-    }
-});
-
-// POST /api/admin/upload-excel - Upload/replace Excel data file
-router.post('/upload-excel', adminAuth, multer({
-    storage: multer.diskStorage({
-        destination: (req, file, cb) => {
-            const { DATA_DIR } = require('../utils/excel');
-            cb(null, DATA_DIR);
-        },
-        filename: (req, file, cb) => {
-            cb(null, file.originalname);
-        }
-    }),
-    fileFilter: (req, file, cb) => {
-        if (path.extname(file.originalname).toLowerCase() === '.xlsx') {
-            cb(null, true);
-        } else {
-            cb(new Error('Only .xlsx files are allowed'));
-        }
-    }
-}).single('file'), (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'No file uploaded' });
-        }
-        res.json({ success: true, message: `${req.file.originalname} uploaded successfully` });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to upload Excel file' });
     }
 });
 

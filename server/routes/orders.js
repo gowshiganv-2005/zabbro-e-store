@@ -28,7 +28,7 @@ function authenticate(req, res, next) {
 }
 
 // POST /api/orders - Create new order
-router.post('/', authenticate, (req, res) => {
+router.post('/', authenticate, async (req, res) => {
     try {
         const { products, shippingAddress, paymentMethod } = req.body;
 
@@ -58,21 +58,21 @@ router.post('/', authenticate, (req, res) => {
             updatedAt: new Date().toISOString()
         };
 
-        appendRow(ORDERS_FILE, order);
+        await appendRow(ORDERS_FILE, order);
 
         // Update inventory
-        products.forEach(item => {
-            const product = findRow('products.xlsx', 'id', item.productId);
+        for (const item of products) {
+            const product = await findRow('products.xlsx', 'id', item.productId);
             if (product) {
                 const newStock = Math.max(0, (product.stock || 0) - item.quantity);
-                updateRow('products.xlsx', 'id', item.productId, { stock: newStock });
-                updateRow('inventory.xlsx', 'productId', item.productId, {
+                await updateRow('products.xlsx', 'id', item.productId, { stock: newStock });
+                await updateRow('inventory.xlsx', 'productId', item.productId, {
                     currentStock: newStock,
                     availableStock: newStock,
                     status: newStock > 20 ? 'in_stock' : newStock > 0 ? 'low_stock' : 'out_of_stock'
                 });
             }
-        });
+        }
 
         res.status(201).json({ success: true, data: order, message: 'Order placed successfully' });
 
@@ -88,13 +88,13 @@ router.post('/', authenticate, (req, res) => {
 });
 
 // GET /api/orders - Get user's orders
-router.get('/', authenticate, (req, res) => {
+router.get('/', authenticate, async (req, res) => {
     try {
         let orders;
         if (req.user.role === 'admin') {
-            orders = readExcel(ORDERS_FILE);
+            orders = await readExcel(ORDERS_FILE);
         } else {
-            orders = findRows(ORDERS_FILE, 'userId', req.user.id);
+            orders = await findRows(ORDERS_FILE, 'userId', req.user.id);
         }
 
         // Parse products JSON for each order
@@ -113,9 +113,9 @@ router.get('/', authenticate, (req, res) => {
 });
 
 // GET /api/orders/:id - Get single order
-router.get('/:id', authenticate, (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
     try {
-        const order = findRow(ORDERS_FILE, 'id', req.params.id);
+        const order = await findRow(ORDERS_FILE, 'id', req.params.id);
         if (!order) {
             return res.status(404).json({ success: false, message: 'Order not found' });
         }
@@ -133,7 +133,7 @@ router.get('/:id', authenticate, (req, res) => {
 });
 
 // PUT /api/orders/:id/status - Update order status (Admin)
-router.put('/:id/status', authenticate, (req, res) => {
+router.put('/:id/status', authenticate, async (req, res) => {
     try {
         const { status } = req.body;
         const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
@@ -142,7 +142,7 @@ router.put('/:id/status', authenticate, (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid status' });
         }
 
-        const updated = updateRow(ORDERS_FILE, 'id', req.params.id, {
+        const updated = await updateRow(ORDERS_FILE, 'id', req.params.id, {
             status,
             updatedAt: new Date().toISOString()
         });
@@ -153,21 +153,21 @@ router.put('/:id/status', authenticate, (req, res) => {
 
         // If order cancelled, restore inventory
         if (status === 'cancelled') {
-            const order = findRow(ORDERS_FILE, 'id', req.params.id);
+            const order = await findRow(ORDERS_FILE, 'id', req.params.id);
             if (order) {
                 const products = typeof order.products === 'string' ? JSON.parse(order.products) : order.products;
-                products.forEach(item => {
-                    const product = findRow('products.xlsx', 'id', item.productId);
+                for (const item of products) {
+                    const product = await findRow('products.xlsx', 'id', item.productId);
                     if (product) {
                         const newStock = (product.stock || 0) + item.quantity;
-                        updateRow('products.xlsx', 'id', item.productId, { stock: newStock });
-                        updateRow('inventory.xlsx', 'productId', item.productId, {
+                        await updateRow('products.xlsx', 'id', item.productId, { stock: newStock });
+                        await updateRow('inventory.xlsx', 'productId', item.productId, {
                             currentStock: newStock,
                             availableStock: newStock,
                             status: newStock > 20 ? 'in_stock' : 'low_stock'
                         });
                     }
-                });
+                }
             }
         }
 
@@ -178,9 +178,9 @@ router.put('/:id/status', authenticate, (req, res) => {
 });
 
 // GET /api/orders/stats/summary - Get order statistics (Admin)
-router.get('/stats/summary', authenticate, (req, res) => {
+router.get('/stats/summary', authenticate, async (req, res) => {
     try {
-        const orders = readExcel(ORDERS_FILE);
+        const orders = await readExcel(ORDERS_FILE);
 
         const stats = {
             totalOrders: orders.length,

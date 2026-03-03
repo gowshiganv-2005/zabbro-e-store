@@ -27,9 +27,9 @@ function adminAuth(req, res, next) {
 }
 
 // GET /api/products - Get all products with optional filtering
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
     try {
-        let products = readExcel(PRODUCTS_FILE);
+        let products = await readExcel(PRODUCTS_FILE);
         const { category, search, sort, minPrice, maxPrice, featured, bestSeller, newArrival, page, limit } = req.query;
 
         // Filter by category
@@ -78,7 +78,7 @@ router.get('/', (req, res) => {
         const paginatedProducts = products.slice(startIndex, startIndex + limitNum);
 
         // Get unique categories
-        const allProducts = readExcel(PRODUCTS_FILE);
+        const allProducts = await readExcel(PRODUCTS_FILE);
         const categories = [...new Set(allProducts.map(p => p.category))];
 
         res.json({
@@ -95,9 +95,9 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/products/categories - Get all categories
-router.get('/categories', (req, res) => {
+router.get('/categories', async (req, res) => {
     try {
-        const products = readExcel(PRODUCTS_FILE);
+        const products = await readExcel(PRODUCTS_FILE);
         const categories = [...new Set(products.map(p => p.category))];
         const categoryCounts = categories.map(cat => ({
             name: cat,
@@ -110,9 +110,9 @@ router.get('/categories', (req, res) => {
 });
 
 // GET /api/products/:id - Get single product
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
     try {
-        const product = findRow(PRODUCTS_FILE, 'id', req.params.id);
+        const product = await findRow(PRODUCTS_FILE, 'id', req.params.id);
         if (!product) {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
@@ -123,7 +123,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/products - Create new product (Admin only)
-router.post('/', adminAuth, (req, res) => {
+router.post('/', adminAuth, async (req, res) => {
     try {
         const newProduct = {
             id: `prod_${uuidv4().slice(0, 8)}`,
@@ -133,7 +133,7 @@ router.post('/', adminAuth, (req, res) => {
             createdAt: new Date().toISOString()
         };
 
-        appendRow(PRODUCTS_FILE, newProduct);
+        await appendRow(PRODUCTS_FILE, newProduct);
 
         // Also add to inventory
         const inventoryItem = {
@@ -148,7 +148,7 @@ router.post('/', adminAuth, (req, res) => {
             supplier: newProduct.brand || '',
             status: (newProduct.stock || 0) > 20 ? 'in_stock' : 'low_stock'
         };
-        appendRow('inventory.xlsx', inventoryItem);
+        await appendRow('inventory.xlsx', inventoryItem);
 
         res.status(201).json({ success: true, data: newProduct, message: 'Product created successfully' });
     } catch (error) {
@@ -157,9 +157,9 @@ router.post('/', adminAuth, (req, res) => {
 });
 
 // PUT /api/products/:id - Update product (Admin only)
-router.put('/:id', adminAuth, (req, res) => {
+router.put('/:id', adminAuth, async (req, res) => {
     try {
-        const updated = updateRow(PRODUCTS_FILE, 'id', req.params.id, req.body);
+        const updated = await updateRow(PRODUCTS_FILE, 'id', req.params.id, req.body);
         if (!updated) {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
@@ -174,10 +174,10 @@ router.put('/:id', adminAuth, (req, res) => {
         if (req.body.name) inventoryUpdates.productName = req.body.name;
         if (req.body.brand) inventoryUpdates.supplier = req.body.brand;
         if (Object.keys(inventoryUpdates).length > 0) {
-            updateRow('inventory.xlsx', 'productId', req.params.id, inventoryUpdates);
+            await updateRow('inventory.xlsx', 'productId', req.params.id, inventoryUpdates);
         }
 
-        const product = findRow(PRODUCTS_FILE, 'id', req.params.id);
+        const product = await findRow(PRODUCTS_FILE, 'id', req.params.id);
         res.json({ success: true, data: product, message: 'Product updated successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to update product' });
@@ -185,13 +185,13 @@ router.put('/:id', adminAuth, (req, res) => {
 });
 
 // DELETE /api/products/:id - Delete product (Admin only)
-router.delete('/:id', adminAuth, (req, res) => {
+router.delete('/:id', adminAuth, async (req, res) => {
     try {
-        const deleted = deleteRow(PRODUCTS_FILE, 'id', req.params.id);
+        const deleted = await deleteRow(PRODUCTS_FILE, 'id', req.params.id);
         if (!deleted) {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
-        deleteRow('inventory.xlsx', 'productId', req.params.id);
+        await deleteRow('inventory.xlsx', 'productId', req.params.id);
         res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to delete product' });

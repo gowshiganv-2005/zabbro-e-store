@@ -23,7 +23,7 @@ router.post('/register', async (req, res) => {
         }
 
         // Check if user already exists
-        const existing = findRow(USERS_FILE, 'email', email);
+        const existing = await findRow(USERS_FILE, 'email', email.toLowerCase());
         if (existing) {
             return res.status(409).json({ success: false, message: 'An account with this email already exists' });
         }
@@ -41,7 +41,7 @@ router.post('/register', async (req, res) => {
             lastLogin: new Date().toISOString()
         };
 
-        appendRow(USERS_FILE, newUser);
+        await appendRow(USERS_FILE, newUser);
 
         const token = jwt.sign(
             { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name },
@@ -74,7 +74,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email and password are required' });
         }
 
-        const user = findRow(USERS_FILE, 'email', email.toLowerCase());
+        const user = await findRow(USERS_FILE, 'email', email.toLowerCase());
         if (!user) {
             return res.status(401).json({ success: false, message: 'Invalid email or password' });
         }
@@ -85,7 +85,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Update last login
-        updateRow(USERS_FILE, 'id', user.id, { lastLogin: new Date().toISOString() });
+        await updateRow(USERS_FILE, 'id', user.id, { lastLogin: new Date().toISOString() });
 
         const token = jwt.sign(
             { id: user.id, email: user.email, role: user.role, name: user.name },
@@ -112,7 +112,7 @@ router.post('/login', async (req, res) => {
 });
 
 // GET /api/users/profile - Get user profile (requires auth)
-router.get('/profile', (req, res) => {
+router.get('/profile', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
@@ -120,7 +120,7 @@ router.get('/profile', (req, res) => {
         }
 
         const decoded = jwt.verify(token, JWT_SECRET);
-        const user = findRow(USERS_FILE, 'id', decoded.id);
+        const user = await findRow(USERS_FILE, 'id', decoded.id);
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
@@ -134,7 +134,7 @@ router.get('/profile', (req, res) => {
 });
 
 // PUT /api/users/profile - Update user profile
-router.put('/profile', (req, res) => {
+router.put('/profile', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
@@ -149,9 +149,9 @@ router.put('/profile', (req, res) => {
         if (phone) updates.phone = phone;
         if (address) updates.address = address;
 
-        updateRow(USERS_FILE, 'id', decoded.id, updates);
+        await updateRow(USERS_FILE, 'id', decoded.id, updates);
 
-        const user = findRow(USERS_FILE, 'id', decoded.id);
+        const user = await findRow(USERS_FILE, 'id', decoded.id);
         const { password, ...safeUser } = user;
 
         res.json({ success: true, data: safeUser, message: 'Profile updated successfully' });
@@ -161,9 +161,9 @@ router.put('/profile', (req, res) => {
 });
 
 // GET /api/users - Get all users (Admin only)
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
     try {
-        const users = readExcel(USERS_FILE);
+        const users = await readExcel(USERS_FILE);
         const safeUsers = users.map(({ password, ...user }) => user);
         res.json({ success: true, data: safeUsers });
     } catch (error) {
@@ -172,13 +172,13 @@ router.get('/', (req, res) => {
 });
 
 // DELETE /api/users/:id - Delete user (Admin only)
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) return res.status(401).json({ success: false, message: 'Authentication required' });
         const user = jwt.verify(token, JWT_SECRET);
         if (user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
-        const deleted = deleteRow(USERS_FILE, 'id', req.params.id);
+        const deleted = await deleteRow(USERS_FILE, 'id', req.params.id);
         if (!deleted) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }

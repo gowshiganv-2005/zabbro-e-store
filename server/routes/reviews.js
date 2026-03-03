@@ -13,9 +13,9 @@ const REVIEWS_FILE = 'reviews.xlsx';
 const JWT_SECRET = process.env.JWT_SECRET || 'ecommerce_secret_key_2026';
 
 // GET /api/reviews/:productId - Get reviews for a product
-router.get('/:productId', (req, res) => {
+router.get('/:productId', async (req, res) => {
     try {
-        const reviews = findRows(REVIEWS_FILE, 'productId', req.params.productId);
+        const reviews = await findRows(REVIEWS_FILE, 'productId', req.params.productId);
         reviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         const avgRating = reviews.length > 0
@@ -45,7 +45,7 @@ router.get('/:productId', (req, res) => {
 });
 
 // POST /api/reviews - Create a new review
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
@@ -60,7 +60,7 @@ router.post('/', (req, res) => {
         }
 
         // Check if user already reviewed this product
-        const existingReviews = findRows(REVIEWS_FILE, 'productId', productId);
+        const existingReviews = await findRows(REVIEWS_FILE, 'productId', productId);
         const alreadyReviewed = existingReviews.find(r => r.userId === decoded.id);
         if (alreadyReviewed) {
             return res.status(409).json({ success: false, message: 'You have already reviewed this product' });
@@ -78,12 +78,12 @@ router.post('/', (req, res) => {
             helpful: 0
         };
 
-        appendRow(REVIEWS_FILE, review);
+        await appendRow(REVIEWS_FILE, review);
 
         // Update product rating
-        const allReviews = findRows(REVIEWS_FILE, 'productId', productId);
+        const allReviews = await findRows(REVIEWS_FILE, 'productId', productId);
         const newAvg = allReviews.reduce((sum, r) => sum + parseFloat(r.rating), 0) / allReviews.length;
-        updateRow('products.xlsx', 'id', productId, {
+        await updateRow('products.xlsx', 'id', productId, {
             rating: Math.round(newAvg * 10) / 10,
             reviewCount: allReviews.length
         });
@@ -95,25 +95,25 @@ router.post('/', (req, res) => {
 });
 
 // DELETE /api/reviews/:id - Delete a review (Admin only)
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) return res.status(401).json({ success: false, message: 'Authentication required' });
         const user = jwt.verify(token, JWT_SECRET);
         if (user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
-        const review = findRow(REVIEWS_FILE, 'id', req.params.id);
+        const review = await findRow(REVIEWS_FILE, 'id', req.params.id);
         if (!review) {
             return res.status(404).json({ success: false, message: 'Review not found' });
         }
 
-        deleteRow(REVIEWS_FILE, 'id', req.params.id);
+        await deleteRow(REVIEWS_FILE, 'id', req.params.id);
 
         // Update product rating
-        const remainingReviews = findRows(REVIEWS_FILE, 'productId', review.productId);
+        const remainingReviews = await findRows(REVIEWS_FILE, 'productId', review.productId);
         const newAvg = remainingReviews.length > 0
             ? remainingReviews.reduce((sum, r) => sum + parseFloat(r.rating), 0) / remainingReviews.length
             : 0;
-        updateRow('products.xlsx', 'id', review.productId, {
+        await updateRow('products.xlsx', 'id', review.productId, {
             rating: Math.round(newAvg * 10) / 10,
             reviewCount: remainingReviews.length
         });

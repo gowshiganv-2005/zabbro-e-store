@@ -1,40 +1,28 @@
 /**
- * Data Setup Script
- * Creates initial Excel files with sample data for the e-commerce store
+ * MongoDB Data Seeding Script
+ * Migrates existing sample data into MongoDB Atlas
  * Run with: npm run setup
+ * 
+ * This script will ONLY seed data if the collections are empty.
+ * Your data is safe — running this multiple times won't overwrite anything.
  */
 
-const XLSX = require('xlsx');
-const path = require('path');
-const fs = require('fs');
+require('dotenv').config();
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
-const DATA_DIR = path.join(__dirname, 'data');
+const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!MONGODB_URI) {
+    console.error('❌ MONGODB_URI not found in .env file!');
+    console.error('   Please create a .env file with your MongoDB connection string.');
+    console.error('   Example: MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/ecommerce-store');
+    process.exit(1);
 }
 
-// Ensure uploads directory exists
-const UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-function writeExcel(filename, data, sheetName = 'Sheet1') {
-    const filePath = path.join(DATA_DIR, filename);
-    // NEVER overwrite existing data files
-    if (fs.existsSync(filePath)) {
-        console.log(`⏭️  SKIPPED ${filename} — file already exists (data preserved)`);
-        return;
-    }
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    XLSX.writeFile(workbook, filePath);
-    console.log(`✓ Created ${filename} with ${data.length} records`);
-}
+// Import models
+const { Product, User, Order, Inventory, Review } = require('./models');
 
 // ═══════════════════════════════════════
 // PRODUCTS DATA
@@ -484,17 +472,65 @@ const reviews = [
 ];
 
 // ═══════════════════════════════════════
-// WRITE ALL FILES
+// SEED DATABASE
 // ═══════════════════════════════════════
-console.log('\n🛒 Setting up e-commerce database...\n');
+async function seedDatabase() {
+    try {
+        console.log('\n🛒 Connecting to MongoDB Atlas...\n');
+        await mongoose.connect(MONGODB_URI);
+        console.log('✅ Connected to MongoDB Atlas\n');
 
-writeExcel('products.xlsx', products);
-writeExcel('users.xlsx', users);
-writeExcel('orders.xlsx', orders);
-writeExcel('inventory.xlsx', inventory);
-writeExcel('reviews.xlsx', reviews);
+        // Seed each collection only if empty
+        const productCount = await Product.countDocuments();
+        if (productCount === 0) {
+            await Product.insertMany(products);
+            console.log(`✓ Created products with ${products.length} records`);
+        } else {
+            console.log(`⏭️  SKIPPED products — already has ${productCount} records (data preserved)`);
+        }
 
-console.log('\n✅ Database setup complete!\n');
-console.log('📧 Admin login: admin@store.com / admin123');
-console.log('📧 Demo login: demo@store.com / demo123');
-console.log('📧 User login: jane@example.com / password123\n');
+        const userCount = await User.countDocuments();
+        if (userCount === 0) {
+            await User.insertMany(users);
+            console.log(`✓ Created users with ${users.length} records`);
+        } else {
+            console.log(`⏭️  SKIPPED users — already has ${userCount} records (data preserved)`);
+        }
+
+        const orderCount = await Order.countDocuments();
+        if (orderCount === 0) {
+            await Order.insertMany(orders);
+            console.log(`✓ Created orders with ${orders.length} records`);
+        } else {
+            console.log(`⏭️  SKIPPED orders — already has ${orderCount} records (data preserved)`);
+        }
+
+        const inventoryCount = await Inventory.countDocuments();
+        if (inventoryCount === 0) {
+            await Inventory.insertMany(inventory);
+            console.log(`✓ Created inventory with ${inventory.length} records`);
+        } else {
+            console.log(`⏭️  SKIPPED inventory — already has ${inventoryCount} records (data preserved)`);
+        }
+
+        const reviewCount = await Review.countDocuments();
+        if (reviewCount === 0) {
+            await Review.insertMany(reviews);
+            console.log(`✓ Created reviews with ${reviews.length} records`);
+        } else {
+            console.log(`⏭️  SKIPPED reviews — already has ${reviewCount} records (data preserved)`);
+        }
+
+        console.log('\n✅ Database setup complete!\n');
+        console.log('📧 Admin login: admin@store.com / admin123');
+        console.log('📧 Demo login: demo@store.com / demo123');
+        console.log('📧 User login: jane@example.com / password123\n');
+    } catch (error) {
+        console.error('❌ Seeding failed:', error.message);
+    } finally {
+        await mongoose.disconnect();
+        process.exit(0);
+    }
+}
+
+seedDatabase();

@@ -1,12 +1,14 @@
 /**
  * E-Commerce Store - Main Server
- * Express.js server with Excel-based backend
+ * Express.js server with MongoDB cloud database
  */
 
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const { connectDB } = require('./utils/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,20 +24,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Ensure upload directories exist
-const dirs = [
-    path.join(__dirname, '..', 'public', 'uploads', 'products'),
-    path.join(__dirname, 'data')
-];
-dirs.forEach(dir => {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-});
-
-// Check if data files exist (warn only, never auto-create)
-const productsFile = path.join(__dirname, 'data', 'products.xlsx');
-if (!fs.existsSync(productsFile)) {
-    console.warn('⚠️  No data files found. Run "npm run setup" to create initial data.');
-    console.warn('⚠️  The server will work but with empty data until setup is run.');
-}
+const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'products');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 // Request logging
 app.use((req, res, next) => {
@@ -72,10 +62,13 @@ app.use((err, req, res, next) => {
 });
 
 // ═══════════════════════════════════════
-// START SERVER
+// CONNECT TO DATABASE & START SERVER
 // ═══════════════════════════════════════
-app.listen(PORT, () => {
-    console.log(`
+async function startServer() {
+    await connectDB();
+
+    app.listen(PORT, () => {
+        console.log(`
 ╔══════════════════════════════════════════════╗
 ║                                              ║
 ║   🛒  E-Commerce Store Server                ║
@@ -83,8 +76,13 @@ app.listen(PORT, () => {
 ║   → Local:   http://localhost:${PORT}           ║
 ║   → API:     http://localhost:${PORT}/api       ║
 ║                                              ║
-║   📊 Excel Database: server/data/            ║
+║   🗄️  Database: MongoDB Atlas (Cloud)         ║
 ║                                              ║
 ╚══════════════════════════════════════════════╝
-  `);
-});
+    `);
+    });
+}
+
+startServer();
+
+module.exports = app;
