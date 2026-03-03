@@ -94,9 +94,13 @@ router.post('/', (req, res) => {
     }
 });
 
-// DELETE /api/reviews/:id - Delete a review
+// DELETE /api/reviews/:id - Delete a review (Admin only)
 router.delete('/:id', (req, res) => {
     try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) return res.status(401).json({ success: false, message: 'Authentication required' });
+        const user = jwt.verify(token, JWT_SECRET);
+        if (user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
         const review = findRow(REVIEWS_FILE, 'id', req.params.id);
         if (!review) {
             return res.status(404).json({ success: false, message: 'Review not found' });

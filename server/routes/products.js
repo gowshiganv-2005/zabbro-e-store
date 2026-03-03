@@ -5,10 +5,26 @@
 
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const { readExcel, writeExcel, findRow, appendRow, updateRow, deleteRow } = require('../utils/excel');
 const { v4: uuidv4 } = require('uuid');
 
 const PRODUCTS_FILE = 'products.xlsx';
+const JWT_SECRET = process.env.JWT_SECRET || 'ecommerce_secret_key_2026';
+
+// Admin-only middleware
+function adminAuth(req, res, next) {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ success: false, message: 'Authentication required' });
+    try {
+        const user = jwt.verify(token, JWT_SECRET);
+        if (user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
+        req.user = user;
+        next();
+    } catch (e) {
+        res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+}
 
 // GET /api/products - Get all products with optional filtering
 router.get('/', (req, res) => {
@@ -106,8 +122,8 @@ router.get('/:id', (req, res) => {
     }
 });
 
-// POST /api/products - Create new product (Admin)
-router.post('/', (req, res) => {
+// POST /api/products - Create new product (Admin only)
+router.post('/', adminAuth, (req, res) => {
     try {
         const newProduct = {
             id: `prod_${uuidv4().slice(0, 8)}`,
@@ -140,8 +156,8 @@ router.post('/', (req, res) => {
     }
 });
 
-// PUT /api/products/:id - Update product (Admin)
-router.put('/:id', (req, res) => {
+// PUT /api/products/:id - Update product (Admin only)
+router.put('/:id', adminAuth, (req, res) => {
     try {
         const updated = updateRow(PRODUCTS_FILE, 'id', req.params.id, req.body);
         if (!updated) {
@@ -168,8 +184,8 @@ router.put('/:id', (req, res) => {
     }
 });
 
-// DELETE /api/products/:id - Delete product (Admin)
-router.delete('/:id', (req, res) => {
+// DELETE /api/products/:id - Delete product (Admin only)
+router.delete('/:id', adminAuth, (req, res) => {
     try {
         const deleted = deleteRow(PRODUCTS_FILE, 'id', req.params.id);
         if (!deleted) {

@@ -1517,6 +1517,30 @@ hr {
   font-weight: 600
 }
 
+.filters-mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--white, #fff);
+  z-index: 1;
+  flex-shrink: 0
+}
+
+.filters-mobile-header h3 {
+  font-size: 1.0625rem;
+  font-weight: 700
+}
+
+@media (max-width: 768px) {
+  .filters-mobile-header {
+    display: flex
+  }
+}
+
 /* ── Product Detail ── */
 .pd-layout {
   display: grid;
@@ -2897,11 +2921,27 @@ hr {
     z-index: 2000;
     border-radius: 0;
     max-height: none;
-    padding: 80px 24px 24px
+    padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--white, #fff)
   }
 
   .filters-sidebar.open {
-    display: block
+    display: flex;
+    flex-direction: column
+  }
+
+  .filters-sidebar .filter-group {
+    padding: 0 20px
+  }
+
+  .filters-sidebar .filters-mobile-header+.filter-group {
+    padding-top: 16px
+  }
+
+  .filters-sidebar>.btn {
+    margin: 16px 20px 32px
   }
 
   .filter-toggle-mobile {
