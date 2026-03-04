@@ -46,13 +46,29 @@
       <nav class="nav-desktop" id="nav-desktop">
         <a href="#/" class="nav-link" data-page="home">Home</a>
         <a href="#/products" class="nav-link" data-page="products">Shop</a>
-        <a href="#/products?category=Home Decor" class="nav-link" data-page="decor">Decor</a>
-        <a href="#/products?category=Electronics" class="nav-link" data-page="electronics">Electronics</a>
-        <a href="#/products?category=Accessories" class="nav-link" data-page="accessories">Accessories</a>
         <a href="#/about" class="nav-link" data-page="about">About Us</a>
+        <a href="#/about#contact" class="nav-link" data-page="contact">Contact Us</a>
       </nav>
       <div class="header-actions">
         <button class="header-btn" id="search-toggle" aria-label="Search"><i data-lucide="search"></i></button>
+        <button class="header-btn" id="notification-toggle" aria-label="Notifications" style="position:relative">
+          <i data-lucide="bell"></i>
+          <span class="notification-badge" id="notification-badge" style="display:none"></span>
+        </button>
+        <!-- Notification Dropdown -->
+        <div id="notification-dropdown" class="notification-dropdown">
+          <div class="notification-header">
+            <h3>Notifications</h3>
+            <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="clearNotifications()">Clear
+              All</button>
+          </div>
+          <div id="notification-list" class="notification-list">
+            <div class="notification-empty">
+              <i data-lucide="bell-off" style="width:32px;height:32px;margin-bottom:8px;opacity:.3"></i>
+              <p>No new notifications</p>
+            </div>
+          </div>
+        </div>
         <a href="#/auth/signup" class="btn btn-sm btn-primary" id="signup-header-btn"
           style="padding:8px 18px;font-size:.75rem">Create Account</a>
         <button class="header-btn" id="user-menu-btn" aria-label="Account"><i data-lucide="user"></i></button>
@@ -77,10 +93,8 @@
     <div class="mobile-nav" id="mobile-nav">
       <a href="#/" class="mobile-nav-link" data-page="home">Home</a>
       <a href="#/products" class="mobile-nav-link" data-page="products">Shop All</a>
-      <a href="#/products?category=Home Decor" class="mobile-nav-link">Home Decor</a>
-      <a href="#/products?category=Electronics" class="mobile-nav-link">Electronics</a>
-      <a href="#/products?category=Accessories" class="mobile-nav-link">Accessories</a>
       <a href="#/about" class="mobile-nav-link">About Us</a>
+      <a href="#/about#contact" class="mobile-nav-link">Contact Us</a>
       <hr class="mobile-nav-divider">
       <a href="#/auth/signup" class="mobile-nav-link">Create Account</a>
       <a href="#/auth" class="mobile-nav-link" id="mobile-auth-link">Sign In</a>

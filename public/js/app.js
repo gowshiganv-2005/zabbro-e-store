@@ -82,6 +82,20 @@
                 e.target.value = '';
             }
         });
+        document.getElementById('notification-toggle')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = document.getElementById('notification-dropdown');
+            dropdown?.classList.toggle('open');
+            if (dropdown?.classList.contains('open')) {
+                refreshNotifications();
+                document.getElementById('notification-badge').style.display = 'none';
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#notification-dropdown') && !e.target.closest('#notification-toggle')) {
+                document.getElementById('notification-dropdown')?.classList.remove('open');
+            }
+        });
         document.getElementById('mobile-menu-toggle')?.addEventListener('click', () => {
             document.getElementById('mobile-nav')?.classList.toggle('open');
         });
@@ -91,6 +105,63 @@
         document.getElementById('view-cart-btn')?.addEventListener('click', closeMiniCart);
         document.getElementById('mini-checkout-btn')?.addEventListener('click', closeMiniCart);
     }
+
+    async function refreshNotifications() {
+        const list = document.getElementById('notification-list');
+        if (!list) return;
+
+        try {
+            const res = await API.products.list({ limit: 5, sort: 'newest' });
+            const notifications = [];
+
+            if (res.success && res.data.length > 0) {
+                res.data.filter(p => p.newArrival).forEach(p => {
+                    notifications.push({
+                        icon: 'package',
+                        title: 'New Arrival',
+                        text: `Check out our new ${p.name}!`,
+                        time: 'Just now',
+                        link: `#/product/${p.id}`
+                    });
+                });
+            }
+
+            if (Store.isLoggedIn()) {
+                const orders = await API.orders.list();
+                if (orders.success && orders.data.length > 0) {
+                    const latest = orders.data[0];
+                    notifications.push({
+                        icon: 'clock',
+                        title: 'Order Status',
+                        text: `Your order ${latest.id} is currently ${latest.status}.`,
+                        time: 'Update',
+                        link: `#/account/orders`
+                    });
+                }
+            }
+
+            if (notifications.length === 0) {
+                list.innerHTML = `<div class="notification-empty"><i data-lucide="bell-off"></i><p>No new notifications</p></div>`;
+            } else {
+                list.innerHTML = notifications.map(n => `
+                    <div class="notification-item" onclick="window.location.hash='${n.link}'">
+                        <div class="notification-icon"><i data-lucide="${n.icon}"></i></div>
+                        <div class="notification-content">
+                            <p><strong>${n.title}</strong>: ${n.text}</p>
+                            <span>${n.time}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            if (window.lucide) lucide.createIcons({ attrs: { class: ['notification-icon-svg'] } });
+        } catch (e) { console.error('Notification error:', e); }
+    }
+
+    window.clearNotifications = () => {
+        const list = document.getElementById('notification-list');
+        if (list) list.innerHTML = `<div class="notification-empty"><i data-lucide="bell-off"></i><p>No new notifications</p></div>`;
+        if (window.lucide) lucide.createIcons();
+    };
 
     function openMiniCart() {
         document.getElementById('mini-cart')?.classList.add('open');

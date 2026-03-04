@@ -201,4 +201,28 @@ router.get('/stats/summary', authenticate, async (req, res) => {
     }
 });
 
+// DELETE /api/orders/:id - Delete order history
+router.delete('/:id', authenticate, async (req, res) => {
+    try {
+        const order = await findRow(ORDERS_FILE, 'id', req.params.id);
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Order not found' });
+        }
+
+        // Only admin or the order owner can delete
+        if (req.user.role !== 'admin' && order.userId !== req.user.id) {
+            return res.status(403).json({ success: false, message: 'Permission denied' });
+        }
+
+        const deleted = await deleteRow(ORDERS_FILE, 'id', req.params.id);
+        if (deleted) {
+            res.json({ success: true, message: 'Order history deleted successfully' });
+        } else {
+            res.status(500).json({ success: false, message: 'Failed to delete order' });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error deleting order', error: error.message });
+    }
+});
+
 module.exports = router;

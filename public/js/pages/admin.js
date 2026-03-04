@@ -123,25 +123,46 @@ async function loadOrdersTab(el) {
     <div class="admin-card">
       <div class="admin-card-header"><h3>All Orders (${res.data.length})</h3></div>
       <div class="admin-card-body">
-        <table class="admin-table"><thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>
+        <table class="admin-table"><thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody>
         ${res.data.map(o => {
     const prods = Array.isArray(o.products) ? o.products : [];
+    const prodSummary = prods.map(p => `${p.name || 'Product'} (x${p.quantity || 1})`).join(', ');
     return `<tr>
             <td style="font-weight:600">${o.id}</td>
-            <td>${o.userName}<br><span style="font-size:.75rem;color:var(--text-muted)">${o.userEmail}</span></td>
-            <td>${prods.length}</td>
+            <td>${o.userName || 'Guest'}<br><span style="font-size:.75rem;color:var(--text-muted)">${o.userEmail || ''}</span></td>
+            <td>
+              <div style="font-size:.75rem;max-width:200px" title="${prodSummary}">
+                ${prods.length} item${prods.length !== 1 ? 's' : ''}:<br>
+                <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${prodSummary}</div>
+              </div>
+            </td>
             <td style="font-weight:600">${formatPrice(o.total)}</td>
             <td><span class="status-badge status-${o.status}">${o.status}</span></td>
-            <td style="font-size:.8125rem">${new Date(o.createdAt).toLocaleDateString()}</td>
-            <td><select class="form-select" style="padding:6px 8px;font-size:.75rem;min-width:110px" onchange="updateOrderStatus('${o.id}',this.value)">
-              ${['pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}
-            </select></td>
+            <td>
+              <div style="display:flex;gap:8px;align-items:center">
+                <select class="form-select" style="padding:6px 8px;font-size:.75rem;min-width:110px" onchange="updateOrderStatus('${o.id}',this.value)">
+                  ${['pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+                <button class="btn btn-sm btn-ghost" style="color:var(--danger);padding:4px" onclick="deleteOrder('${o.id}')" title="Delete History">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </td>
           </tr>`;
   }).join('')}
         </tbody></table>
       </div>
     </div>
   `;
+}
+
+async function deleteOrder(id) {
+  if (!confirm('Are you sure you want to delete this order history? This action cannot be undone.')) return;
+  try {
+    await API.orders.delete(id);
+    Toast.show('Order history deleted', 'success');
+    loadAdminTab('orders');
+  } catch (e) { Toast.show(e.message, 'error'); }
 }
 
 async function loadInventoryTab(el) {

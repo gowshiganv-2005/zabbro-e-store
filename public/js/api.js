@@ -70,7 +70,8 @@ const API = {
         create(data) { return API.post('/orders', data); },
         list() { return API.get('/orders'); },
         get(id) { return API.get(`/orders/${id}`); },
-        updateStatus(id, status) { return API.put(`/orders/${id}/status`, { status }); }
+        updateStatus(id, status) { return API.put(`/orders/${id}/status`, { status }); },
+        delete(id) { return API.delete(`/orders/${id}`); }
     },
 
     // ── Reviews ──
