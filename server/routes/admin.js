@@ -14,32 +14,31 @@ const { readExcel, writeExcel, updateRow } = require('../utils/excel');
 const JWT_SECRET = process.env.JWT_SECRET || 'ecommerce_secret_key_2026';
 
 // Configure multer for image uploads
-// Falls back to memory storage on Vercel/Render where the file system is read-only
-const isServerless = process.env.VERCEL || process.env.RENDER || process.env.NODE_ENV === 'production';
+// Forces memory storage on Vercel/Render to avoid read-only filesystem errors
+const isServerless = process.env.VERCEL === '1' || !!process.env.RENDER || !!process.env.VERCEL;
 
 let storage;
-try {
-    const uploadPath = path.join(__dirname, '..', '..', 'public', 'uploads', 'products');
-    if (!fs.existsSync(uploadPath) && !isServerless) {
-        fs.mkdirSync(uploadPath, { recursive: true });
-    }
-
-    storage = multer.diskStorage({
-        destination: (req, file, cb) => {
-            cb(null, uploadPath);
-        },
-        filename: (req, file, cb) => {
-            const ext = path.extname(file.originalname);
-            cb(null, `product_${Date.now()}${ext}`);
-        }
-    });
-} catch (e) {
-    console.warn('⚠️ Disk storage unavailable, falling back to memory storage');
+if (isServerless) {
+    console.log('☁️ Serving in Serverless environment - Using Memory Storage');
     storage = multer.memoryStorage();
+} else {
+    try {
+        const uploadPath = path.join(__dirname, '..', '..', 'public', 'uploads', 'products');
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        storage = multer.diskStorage({
+            destination: (req, file, cb) => cb(null, uploadPath),
+            filename: (req, file, cb) => {
+                const ext = path.extname(file.originalname);
+                cb(null, `product_${Date.now()}${ext}`);
+            }
+        });
+    } catch (e) {
+        console.warn('⚠️ Disk storage setup failed, falling back to memory storage');
+        storage = multer.memoryStorage();
+    }
 }
-
-// Ensure we have a storage object
-if (!storage) storage = multer.memoryStorage();
 
 const upload = multer({
     storage,
@@ -192,27 +191,38 @@ router.put('/inventory/:productId', adminAuth, async (req, res) => {
 });
 
 // POST /api/admin/upload - Upload product image
-router.post('/upload', adminAuth, upload.single('image'), (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'No file uploaded' });
+router.post('/upload', adminAuth, (req, res) => {
+    upload.single('image')(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            console.error('Multer Error:', err);
+            return res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
+        } else if (err) {
+            console.error('Upload Error:', err);
+            return res.status(500).json({ success: false, message: err.message });
         }
 
-        let imageUrl;
-        if (req.file.buffer) {
-            // Convert to Base64 for Cloud-based storage (Google Sheets)
-            const b64 = req.file.buffer.toString('base64');
-            imageUrl = `data:${req.file.mimetype};base64,${b64}`;
-        } else {
-            // Local path for disk storage
-            imageUrl = `/uploads/products/${req.file.filename}`;
-        }
+        try {
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: 'No file uploaded' });
+            }
 
-        res.json({ success: true, data: { url: imageUrl }, message: 'Image uploaded successfully' });
-    } catch (error) {
-        console.error('Upload Error:', error);
-        res.status(500).json({ success: false, message: 'Failed to upload image', error: error.message });
-    }
+            let imageUrl;
+            if (req.file.buffer) {
+                // Convert to Base64 for Cloud-based storage (Google Sheets)
+                const b64 = req.file.buffer.toString('base64');
+                imageUrl = `data:${req.file.mimetype};base64,${b64}`;
+            } else {
+                // Local path for disk storage
+                imageUrl = `/uploads/products/${req.file.filename}`;
+            }
+
+            console.log('✅ Image uploaded successfully:', imageUrl.substring(0, 50) + '...');
+            res.json({ success: true, data: { url: imageUrl }, message: 'Image uploaded successfully' });
+        } catch (error) {
+            console.error('Processing Error:', error);
+            res.status(500).json({ success: false, message: 'Failed to process image', error: error.message });
+        }
+    });
 });
 
 module.exports = router;
