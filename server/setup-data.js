@@ -1,32 +1,13 @@
 /**
- * MongoDB Data Seeding Script
- * Migrates existing sample data into MongoDB Atlas
+ * Google Sheets Data Seeding Script
+ * Populates your Google Spreadsheet with initial sample data.
  * Run with: npm run setup
- * 
- * This script will ONLY seed data if the collections are empty.
- * Your data is safe — running this multiple times won't overwrite anything.
  */
 
 require('dotenv').config();
-const mongoose = require('mongoose');
+const { writeExcel, readExcel } = require('./utils/excel');
 const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-    console.error('❌ MONGODB_URI not found in .env file!');
-    console.error('   Please create a .env file with your MongoDB connection string.');
-    console.error('   Example: MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/ecommerce-store');
-    process.exit(1);
-}
-
-// Import models
-const { Product, User, Order, Inventory, Review } = require('./models');
-
-// ═══════════════════════════════════════
-// PRODUCTS DATA
-// ═══════════════════════════════════════
 const products = [
     {
         id: 'prod_001',
@@ -153,138 +134,9 @@ const products = [
         material: 'Stainless Steel',
         color: 'Rose Gold',
         tags: 'watch,automatic,heritage,luxury,accessories'
-    },
-    {
-        id: 'prod_007',
-        name: 'Artisan Coffee Dripper Set',
-        price: 69.00,
-        originalPrice: 89.00,
-        category: 'Kitchen',
-        subcategory: 'Coffee',
-        description: 'Pour-over coffee dripper with double-wall borosilicate glass carafe. Includes stainless steel reusable filter and bamboo stand. Makes 4 cups of perfect coffee.',
-        image: '/uploads/products/coffee.jpg',
-        images: '/uploads/products/coffee.jpg,/uploads/products/coffee-2.jpg',
-        stock: 100,
-        rating: 4.4,
-        reviewCount: 203,
-        featured: false,
-        bestSeller: true,
-        newArrival: false,
-        brand: 'BrewCraft',
-        material: 'Glass & Bamboo',
-        color: 'Natural',
-        tags: 'coffee,dripper,pour-over,kitchen,artisan'
-    },
-    {
-        id: 'prod_008',
-        name: 'Linen Blend Cushion Set',
-        price: 99.00,
-        originalPrice: 129.00,
-        category: 'Home Decor',
-        subcategory: 'Cushions',
-        description: 'Set of 2 premium linen blend cushion covers with hidden zipper closure. Subtle textured weave adds depth to any space. Inserts included.',
-        image: '/uploads/products/cushion.jpg',
-        images: '/uploads/products/cushion.jpg,/uploads/products/cushion-2.jpg',
-        stock: 75,
-        rating: 4.3,
-        reviewCount: 91,
-        featured: false,
-        bestSeller: false,
-        newArrival: true,
-        brand: 'NestHome',
-        material: 'Linen Blend',
-        color: 'Sage Green',
-        tags: 'cushion,linen,home decor,set'
-    },
-    {
-        id: 'prod_009',
-        name: 'Smart Fitness Tracker Pro',
-        price: 199.00,
-        originalPrice: 249.00,
-        category: 'Electronics',
-        subcategory: 'Wearables',
-        description: 'Advanced fitness tracker with AMOLED display, heart rate monitoring, GPS, and 7-day battery life. Water resistant to 50m. Tracks 30+ exercise modes.',
-        image: '/uploads/products/tracker.jpg',
-        images: '/uploads/products/tracker.jpg,/uploads/products/tracker-2.jpg',
-        stock: 120,
-        rating: 4.6,
-        reviewCount: 567,
-        featured: true,
-        bestSeller: true,
-        newArrival: false,
-        brand: 'FitPulse',
-        material: 'Silicone & Aluminum',
-        color: 'Black',
-        tags: 'fitness,tracker,smart,wearable,electronics'
-    },
-    {
-        id: 'prod_010',
-        name: 'Marble & Gold Bookends',
-        price: 149.00,
-        originalPrice: 189.00,
-        category: 'Home Decor',
-        subcategory: 'Accessories',
-        description: 'Elegant bookend set crafted from genuine marble with gold-plated metal accents. Each piece weighs 2kg for stability. A statement piece for any shelf.',
-        image: '/uploads/products/bookends.jpg',
-        images: '/uploads/products/bookends.jpg,/uploads/products/bookends-2.jpg',
-        stock: 25,
-        rating: 4.7,
-        reviewCount: 34,
-        featured: false,
-        bestSeller: false,
-        newArrival: true,
-        brand: 'StoneArt',
-        material: 'Marble & Metal',
-        color: 'White/Gold',
-        tags: 'bookends,marble,gold,decor,luxury'
-    },
-    {
-        id: 'prod_011',
-        name: 'Cashmere Blend Scarf',
-        price: 159.00,
-        originalPrice: 199.00,
-        category: 'Accessories',
-        subcategory: 'Scarves',
-        description: 'Luxuriously soft cashmere blend scarf with hand-rolled edges. Lightweight yet warm. Available in classic neutral tones that pair with everything.',
-        image: '/uploads/products/scarf.jpg',
-        images: '/uploads/products/scarf.jpg,/uploads/products/scarf-2.jpg',
-        stock: 50,
-        rating: 4.8,
-        reviewCount: 128,
-        featured: false,
-        bestSeller: true,
-        newArrival: false,
-        brand: 'Finesse',
-        material: 'Cashmere Blend',
-        color: 'Camel',
-        tags: 'scarf,cashmere,luxury,accessories,warm'
-    },
-    {
-        id: 'prod_012',
-        name: 'Portable Bluetooth Speaker',
-        price: 129.00,
-        originalPrice: 159.00,
-        category: 'Electronics',
-        subcategory: 'Speakers',
-        description: 'Compact waterproof speaker with 360° sound, 20-hour battery, and built-in microphone. Pairs two speakers for true stereo sound. Rugged yet elegant design.',
-        image: '/uploads/products/speaker.jpg',
-        images: '/uploads/products/speaker.jpg,/uploads/products/speaker-2.jpg',
-        stock: 90,
-        rating: 4.5,
-        reviewCount: 234,
-        featured: false,
-        bestSeller: false,
-        newArrival: false,
-        brand: 'SoundElite',
-        material: 'Fabric & Aluminum',
-        color: 'Charcoal',
-        tags: 'speaker,bluetooth,portable,waterproof,electronics'
     }
 ];
 
-// ═══════════════════════════════════════
-// USERS DATA
-// ═══════════════════════════════════════
 const users = [
     {
         id: 'user_001',
@@ -296,241 +148,48 @@ const users = [
         address: '123 Admin Street, New York, NY 10001',
         createdAt: new Date().toISOString(),
         lastLogin: new Date().toISOString()
-    },
-    {
-        id: 'user_002',
-        name: 'Jane Cooper',
-        email: 'jane@example.com',
-        password: bcrypt.hashSync('password123', 10),
-        role: 'customer',
-        phone: '+1-555-0101',
-        address: '456 Oak Avenue, Los Angeles, CA 90001',
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString()
-    },
-    {
-        id: 'user_003',
-        name: 'Demo User',
-        email: 'demo@store.com',
-        password: bcrypt.hashSync('demo123', 10),
-        role: 'customer',
-        phone: '+1-555-0102',
-        address: '789 Pine Road, Chicago, IL 60601',
-        createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString()
     }
 ];
 
-// ═══════════════════════════════════════
-// ORDERS DATA
-// ═══════════════════════════════════════
-const orders = [
-    {
-        id: 'ord_001',
-        userId: 'user_002',
-        userName: 'Jane Cooper',
-        userEmail: 'jane@example.com',
-        products: JSON.stringify([
-            { productId: 'prod_001', name: 'Minimalist Ceramic Vase', quantity: 1, price: 89.00 },
-            { productId: 'prod_004', name: 'Organic Cotton Throw Blanket', quantity: 2, price: 129.00 }
-        ]),
-        subtotal: 347.00,
-        shipping: 0,
-        tax: 27.76,
-        total: 374.76,
-        status: 'delivered',
-        shippingAddress: '456 Oak Avenue, Los Angeles, CA 90001',
-        paymentMethod: 'Credit Card',
-        createdAt: '2026-02-15T10:30:00Z',
-        updatedAt: '2026-02-20T14:00:00Z'
-    },
-    {
-        id: 'ord_002',
-        userId: 'user_002',
-        userName: 'Jane Cooper',
-        userEmail: 'jane@example.com',
-        products: JSON.stringify([
-            { productId: 'prod_003', name: 'Wireless Noise-Cancelling Headphones', quantity: 1, price: 349.00 }
-        ]),
-        subtotal: 349.00,
-        shipping: 0,
-        tax: 27.92,
-        total: 376.92,
-        status: 'shipped',
-        shippingAddress: '456 Oak Avenue, Los Angeles, CA 90001',
-        paymentMethod: 'PayPal',
-        createdAt: '2026-02-25T09:15:00Z',
-        updatedAt: '2026-02-27T11:00:00Z'
-    },
-    {
-        id: 'ord_003',
-        userId: 'user_003',
-        userName: 'Demo User',
-        userEmail: 'demo@store.com',
-        products: JSON.stringify([
-            { productId: 'prod_006', name: 'Heritage Watch Collection', quantity: 1, price: 599.00 },
-            { productId: 'prod_011', name: 'Cashmere Blend Scarf', quantity: 1, price: 159.00 }
-        ]),
-        subtotal: 758.00,
-        shipping: 0,
-        tax: 60.64,
-        total: 818.64,
-        status: 'processing',
-        shippingAddress: '789 Pine Road, Chicago, IL 60601',
-        paymentMethod: 'Credit Card',
-        createdAt: '2026-03-01T16:45:00Z',
-        updatedAt: '2026-03-01T16:45:00Z'
-    }
-];
-
-// ═══════════════════════════════════════
-// INVENTORY DATA
-// ═══════════════════════════════════════
 const inventory = products.map(p => ({
     productId: p.id,
     productName: p.name,
     currentStock: p.stock,
-    reservedStock: Math.floor(p.stock * 0.1),
-    availableStock: p.stock - Math.floor(p.stock * 0.1),
+    reservedStock: 0,
+    availableStock: p.stock,
     reorderLevel: 10,
     reorderQuantity: 50,
-    lastRestocked: '2026-02-20T00:00:00Z',
+    lastRestocked: new Date().toISOString(),
     supplier: p.brand,
-    status: p.stock > 20 ? 'in_stock' : p.stock > 0 ? 'low_stock' : 'out_of_stock'
+    status: 'in_stock'
 }));
 
-// ═══════════════════════════════════════
-// REVIEWS DATA
-// ═══════════════════════════════════════
-const reviews = [
-    {
-        id: 'rev_001',
-        productId: 'prod_001',
-        userId: 'user_002',
-        userName: 'Jane Cooper',
-        rating: 5,
-        title: 'Absolutely stunning piece',
-        comment: 'The vase is even more beautiful in person. The glaze has this wonderful subtle texture. It looks perfect on my mantel with some dried eucalyptus.',
-        createdAt: '2026-02-18T14:30:00Z',
-        helpful: 12
-    },
-    {
-        id: 'rev_002',
-        productId: 'prod_001',
-        userId: 'user_003',
-        userName: 'Demo User',
-        rating: 4,
-        title: 'Beautiful but slightly smaller than expected',
-        comment: 'Really lovely craftsmanship. My only note is that it was a touch smaller than I expected from the photos, but the quality is undeniable.',
-        createdAt: '2026-02-22T09:15:00Z',
-        helpful: 5
-    },
-    {
-        id: 'rev_003',
-        productId: 'prod_003',
-        userId: 'user_002',
-        userName: 'Jane Cooper',
-        rating: 5,
-        title: 'Best headphones I have ever owned',
-        comment: 'The noise cancellation is incredible. I use them for work calls and music, and the sound quality is pristine. Battery lasts well beyond the stated 30 hours.',
-        createdAt: '2026-02-28T11:00:00Z',
-        helpful: 28
-    },
-    {
-        id: 'rev_004',
-        productId: 'prod_002',
-        userId: 'user_003',
-        userName: 'Demo User',
-        rating: 5,
-        title: 'Worth every penny',
-        comment: 'The quality of the leather is outstanding. It has a wonderful smell and the craftsmanship is top-notch. Already getting compliments!',
-        createdAt: '2026-02-20T16:45:00Z',
-        helpful: 15
-    },
-    {
-        id: 'rev_005',
-        productId: 'prod_006',
-        userId: 'user_002',
-        userName: 'Jane Cooper',
-        rating: 5,
-        title: 'A timeless classic',
-        comment: 'This watch is a work of art. The movement is smooth, the dial is gorgeous, and the leather strap is incredibly comfortable. A true heirloom piece.',
-        createdAt: '2026-02-25T20:00:00Z',
-        helpful: 22
-    },
-    {
-        id: 'rev_006',
-        productId: 'prod_009',
-        userId: 'user_003',
-        userName: 'Demo User',
-        rating: 4,
-        title: 'Great tracker, minor app issues',
-        comment: 'The hardware is fantastic and the battery life is amazing. The companion app could use some polish, but overall a great fitness companion.',
-        createdAt: '2026-03-01T08:30:00Z',
-        helpful: 8
+async function seed() {
+    console.log('🚀 Seeding Google Sheets...');
+
+    if (!process.env.GOOGLE_SPREADSHEET_ID) {
+        console.error('❌ GOOGLE_SPREADSHEET_ID missing in .env');
+        return;
     }
-];
 
-// ═══════════════════════════════════════
-// SEED DATABASE
-// ═══════════════════════════════════════
-async function seedDatabase() {
     try {
-        console.log('\n🛒 Connecting to MongoDB Atlas...\n');
-        await mongoose.connect(MONGODB_URI);
-        console.log('✅ Connected to MongoDB Atlas\n');
+        await writeExcel('products.xlsx', products);
+        console.log('✅ Products seeded');
 
-        // Seed each collection only if empty
-        const productCount = await Product.countDocuments();
-        if (productCount === 0) {
-            await Product.insertMany(products);
-            console.log(`✓ Created products with ${products.length} records`);
-        } else {
-            console.log(`⏭️  SKIPPED products — already has ${productCount} records (data preserved)`);
-        }
+        await writeExcel('users.xlsx', users);
+        console.log('✅ Users seeded');
 
-        const userCount = await User.countDocuments();
-        if (userCount === 0) {
-            await User.insertMany(users);
-            console.log(`✓ Created users with ${users.length} records`);
-        } else {
-            console.log(`⏭️  SKIPPED users — already has ${userCount} records (data preserved)`);
-        }
+        await writeExcel('inventory.xlsx', inventory);
+        console.log('✅ Inventory seeded');
 
-        const orderCount = await Order.countDocuments();
-        if (orderCount === 0) {
-            await Order.insertMany(orders);
-            console.log(`✓ Created orders with ${orders.length} records`);
-        } else {
-            console.log(`⏭️  SKIPPED orders — already has ${orderCount} records (data preserved)`);
-        }
+        // Create empty sheets for orders and reviews
+        await writeExcel('orders.xlsx', [{ id: 'order_template', userId: '', products: '[]', total: 0, status: 'pending', createdAt: '' }]);
+        await writeExcel('reviews.xlsx', [{ id: 'review_template', productId: '', userId: '', rating: 5, comment: '', createdAt: '' }]);
 
-        const inventoryCount = await Inventory.countDocuments();
-        if (inventoryCount === 0) {
-            await Inventory.insertMany(inventory);
-            console.log(`✓ Created inventory with ${inventory.length} records`);
-        } else {
-            console.log(`⏭️  SKIPPED inventory — already has ${inventoryCount} records (data preserved)`);
-        }
-
-        const reviewCount = await Review.countDocuments();
-        if (reviewCount === 0) {
-            await Review.insertMany(reviews);
-            console.log(`✓ Created reviews with ${reviews.length} records`);
-        } else {
-            console.log(`⏭️  SKIPPED reviews — already has ${reviewCount} records (data preserved)`);
-        }
-
-        console.log('\n✅ Database setup complete!\n');
-        console.log('📧 Admin login: admin@store.com / admin123');
-        console.log('📧 Demo login: demo@store.com / demo123');
-        console.log('📧 User login: jane@example.com / password123\n');
+        console.log('\n🎉 All sheets seeded successfully!');
     } catch (error) {
         console.error('❌ Seeding failed:', error.message);
-    } finally {
-        await mongoose.disconnect();
-        process.exit(0);
     }
 }
 
-seedDatabase();
+seed();

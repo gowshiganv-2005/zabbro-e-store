@@ -1,6 +1,6 @@
 /**
  * E-Commerce Store - Main Server
- * Express.js server with MongoDB cloud database
+ * Express.js server with Google Sheets cloud database
  */
 
 require('dotenv').config();
@@ -8,7 +8,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { connectDB } = require('./utils/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -62,13 +61,10 @@ app.use((err, req, res, next) => {
 });
 
 // ═══════════════════════════════════════
-// CONNECT TO DATABASE & START SERVER
+// START SERVER
 // ═══════════════════════════════════════
-async function startServer() {
-    await connectDB();
-
-    app.listen(PORT, () => {
-        console.log(`
+app.listen(PORT, () => {
+    console.log(`
 ╔══════════════════════════════════════════════╗
 ║                                              ║
 ║   🛒  E-Commerce Store Server                ║
@@ -76,13 +72,10 @@ async function startServer() {
 ║   → Local:   http://localhost:${PORT}           ║
 ║   → API:     http://localhost:${PORT}/api       ║
 ║                                              ║
-║   🗄️  Database: MongoDB Atlas (Cloud)         ║
+║   📊  Database: Google Sheets (Cloud)         ║
 ║                                              ║
 ╚══════════════════════════════════════════════╝
     `);
-    });
-}
-
-startServer();
+});
 
 module.exports = app;
