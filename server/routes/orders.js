@@ -222,16 +222,15 @@ router.delete('/:id', authenticate, async (req, res) => {
         }
 
         const deleted = await deleteRow(ORDERS_FILE, 'id', req.params.id);
-        console.log(`✨ deleteRow result for ${req.params.id}: ${deleted}`);
 
         if (deleted) {
             res.json({ success: true, message: 'Order history deleted successfully' });
         } else {
-            res.status(500).json({ success: false, message: 'Failed to delete order from spreadsheet' });
+            res.status(404).json({ success: false, message: 'Order ID not found in database' });
         }
     } catch (error) {
-        console.error('🔥 CRITICAL: Delete order error:', error.message);
-        res.status(500).json({ success: false, message: 'Error deleting order', error: error.message });
+        console.error('🔥 DELETE ERROR:', error);
+        res.status(500).json({ success: false, message: `System Error: ${error.message}` });
     }
 });
 

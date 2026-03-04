@@ -75,13 +75,32 @@ async function getSheetData(sheetName) {
 
 async function setSheetData(sheetName, data) {
   if (!SPREADSHEET_ID) throw new Error('GOOGLE_SPREADSHEET_ID is missing');
-  if (!data || data.length === 0) return true;
 
   try {
+    // If no data, just clear the sheet (keep only headers if possible, or just blank it)
+    if (!data || data.length === 0) {
+      console.log(`🧹 Clearing sheet: ${sheetName} (Empty data)`);
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:Z`,
+      });
+      return true;
+    }
+
     // Dynamically collect all unique keys from all objects to ensure no data loss
     const headerSet = new Set();
-    data.forEach(item => Object.keys(item).forEach(key => headerSet.add(key)));
+    data.forEach(item => {
+      if (item && typeof item === 'object') {
+        Object.keys(item).forEach(key => headerSet.add(key));
+      }
+    });
     const headers = Array.from(headerSet);
+
+    if (headers.length === 0) {
+      console.log(`🧹 Clearing sheet: ${sheetName} (No columns found)`);
+      await sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A:Z` });
+      return true;
+    }
 
     const rows = [headers];
     data.forEach(item => {
