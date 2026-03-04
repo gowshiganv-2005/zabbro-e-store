@@ -26,7 +26,11 @@ const API = {
             if (!res.ok) throw new Error(data.message || 'Request failed');
             return data;
         } catch (err) {
-            console.error(`API Error [${endpoint}]:`, err.message);
+            console.error(`API Error [${endpoint}]:`, err);
+            // Provide a more helpful message for network failures
+            if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+                throw new Error('Connection failed. Please ensure the local server is running on port 3000.');
+            }
             throw err;
         }
     },

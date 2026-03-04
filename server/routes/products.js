@@ -77,9 +77,8 @@ router.get('/', async (req, res) => {
         const startIndex = (pageNum - 1) * limitNum;
         const paginatedProducts = products.slice(startIndex, startIndex + limitNum);
 
-        // Get unique categories
-        const allProducts = await readExcel(PRODUCTS_FILE);
-        const categories = [...new Set(allProducts.map(p => p.category))];
+        // Get unique categories from the already fetched list
+        const categories = [...new Set(products.map(p => p.category))];
 
         res.json({
             success: true,

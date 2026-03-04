@@ -154,12 +154,13 @@ async function loadHomeData() {
     const catGrid = document.getElementById('categories-grid');
     if (catGrid && catRes.success) {
       catGrid.innerHTML = catRes.data.map((cat, i) => {
-        const icon = categoryIcons[cat.name.toLowerCase()] || defaultIcon;
+        const name = cat.name || 'Unknown';
+        const icon = categoryIcons[name.toLowerCase()] || defaultIcon;
         return `
-          <a href="#/products?category=${encodeURIComponent(cat.name)}" class="category-card fade-in" style="animation-delay:${i * .1}s">
+          <a href="#/products?category=${encodeURIComponent(name)}" class="category-card fade-in" style="animation-delay:${i * .1}s">
             <div class="category-card-icon">${icon}</div>
-            <div class="category-card-name">${cat.name}</div>
-            <div class="category-card-count">${cat.count} products</div>
+            <div class="category-card-name">${name}</div>
+            <div class="category-card-count">${cat.count || 0} products</div>
           </a>
         `;
       }).join('');
