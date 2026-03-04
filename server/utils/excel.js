@@ -14,13 +14,14 @@ if (rawKey.startsWith('"') && rawKey.endsWith('"')) {
 // Clean up escaped newlines (e.g. \\n becomes \n)
 const PRIVATE_KEY = rawKey.replace(/\\n/g, '\n').trim();
 
-// Authentication setup using JWT for better reliability
-const auth = new google.auth.JWT(
-  process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  null,
-  PRIVATE_KEY,
-  ['https://www.googleapis.com/auth/spreadsheets']
-);
+// Authentication setup using GoogleAuth for modern compatibility
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    private_key: PRIVATE_KEY,
+  },
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
 
 const sheets = google.sheets({ version: 'v4', auth });
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
