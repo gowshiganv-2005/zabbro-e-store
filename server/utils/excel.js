@@ -88,6 +88,8 @@ async function setSheetData(sheetName, data) {
       }));
     });
 
+    console.log(`📝 Writing ${rows.length} rows to sheet: ${sheetName}`);
+
     await sheets.spreadsheets.values.clear({
       spreadsheetId: SPREADSHEET_ID,
       range: `${sheetName}!A:Z`,
@@ -101,7 +103,7 @@ async function setSheetData(sheetName, data) {
     });
     return true;
   } catch (error) {
-    console.error(`Error writing to sheet ${sheetName}:`, error.message);
+    console.error(`❌ Sheet Write Error (${sheetName}):`, error.message);
     throw error;
   }
 }

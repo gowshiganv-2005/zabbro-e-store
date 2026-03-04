@@ -16,7 +16,10 @@ function renderAuthPage(mode = 'login') {
         <h1>${isLogin ? 'Welcome back' : 'Create account'}</h1>
         <p class="subtitle">${isLogin ? 'Sign in to access your account' : 'Join ZABBRO for exclusive benefits'}</p>
         <form id="auth-form">
-          ${!isLogin ? `<div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="auth-name" placeholder="John Doe" required></div>` : ''}
+          ${!isLogin ? `
+            <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="auth-name" placeholder="John Doe" required></div>
+            <div class="form-group"><label class="form-label">Phone Number</label><input class="form-input" id="auth-phone" type="tel" placeholder="+91 00000 00000" required></div>
+          ` : ''}
           <div class="form-group"><label class="form-label">Email Address</label><input class="form-input" id="auth-email" type="email" placeholder="you@example.com" required></div>
           <div class="form-group"><label class="form-label">Password</label><input class="form-input" id="auth-password" type="password" placeholder="••••••••" minlength="6" required></div>
           <div id="auth-error" class="form-error" style="margin-bottom:16px;display:none"></div>
@@ -49,7 +52,8 @@ function renderAuthPage(mode = 'login') {
         res = await API.users.login({ email, password });
       } else {
         const name = document.getElementById('auth-name').value.trim();
-        res = await API.users.register({ name, email, password });
+        const phone = document.getElementById('auth-phone').value.trim();
+        res = await API.users.register({ name, phone, email, password });
       }
       if (res.success) {
         Store.setUser(res.data);

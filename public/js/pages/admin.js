@@ -129,7 +129,11 @@ async function loadOrdersTab(el) {
     const prodSummary = prods.map(p => `${p.name || 'Product'} (x${p.quantity || 1})`).join(', ');
     return `<tr>
             <td style="font-weight:600">${o.id}</td>
-            <td>${o.userName || 'Guest'}<br><span style="font-size:.75rem;color:var(--text-muted)">${o.userEmail || ''}</span></td>
+            <td>
+              <div style="font-weight:600">${o.userName || 'Guest'}</div>
+              <div style="font-size:.75rem;color:var(--text-muted)">${o.userEmail || ''}</div>
+              <div style="font-size:.75rem;color:var(--text-muted)">${o.userPhone || ''}</div>
+            </td>
             <td>
               <div style="font-size:.75rem;max-width:200px" title="${prodSummary}">
                 ${prods.length} item${prods.length !== 1 ? 's' : ''}:<br>

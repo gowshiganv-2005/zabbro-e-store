@@ -44,8 +44,9 @@ router.post('/', authenticate, async (req, res) => {
         const order = {
             id: `ord_${uuidv4().slice(0, 8)}`,
             userId: req.user.id,
-            userName: req.user.name,
-            userEmail: req.user.email,
+            userName: req.body.userName || req.user.name || 'Guest',
+            userEmail: req.body.userEmail || req.user.email || '',
+            userPhone: req.body.userPhone || req.user.phone || '',
             products: JSON.stringify(products),
             subtotal: Math.round(subtotal * 100) / 100,
             shipping: Math.round(shipping * 100) / 100,

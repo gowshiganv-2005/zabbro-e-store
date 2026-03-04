@@ -6,7 +6,8 @@
 
     function router() {
         const hash = window.location.hash || '#/';
-        const [path, queryString] = hash.slice(1).split('?');
+        const [rawPath, queryString] = hash.slice(1).split('?');
+        const [path, anchor] = rawPath.split('#');
         const params = Object.fromEntries(new URLSearchParams(queryString || ''));
         const segments = path.split('/').filter(Boolean);
 
@@ -14,7 +15,8 @@
         closeMiniCart();
         // Clean up parallax if navigating away from home
         if (window._heroParallaxCleanup) { window._heroParallaxCleanup(); window._heroParallaxCleanup = null; }
-        window.scrollTo(0, 0);
+
+        if (!anchor) window.scrollTo(0, 0);
 
         switch (segments[0] || '') {
             case '': case 'home':
@@ -44,6 +46,14 @@
             <p style="color:var(--text-secondary);margin-bottom:24px">Page not found</p>
             <a href="#/" class="btn btn-primary">Go Home</a>
           </div>`;
+        }
+
+        // Handle internal anchors after content is loaded
+        if (anchor) {
+            setTimeout(() => {
+                const el = document.getElementById(anchor);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
         }
 
         // Update header Create Account btn visibility

@@ -133,7 +133,20 @@ async function placeOrder() {
       quantity: item.quantity
     }));
 
-    const res = await API.orders.create({ products, shippingAddress: address, paymentMethod });
+    const firstName = document.getElementById('chk-fname')?.value.trim();
+    const lastName = document.getElementById('chk-lname')?.value.trim();
+    const userName = `${firstName} ${lastName}`.trim();
+    const userEmail = document.getElementById('chk-email')?.value.trim();
+    const userPhone = document.getElementById('chk-phone')?.value.trim();
+
+    const res = await API.orders.create({
+      products,
+      shippingAddress: address,
+      paymentMethod,
+      userName,
+      userEmail,
+      userPhone
+    });
     if (res.success) {
       Store.clearCart();
       window.location.hash = `#/order-confirmation/${res.data.id}`;

@@ -44,7 +44,7 @@ router.post('/register', async (req, res) => {
         await appendRow(USERS_FILE, newUser);
 
         const token = jwt.sign(
-            { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name },
+            { id: newUser.id, email: newUser.email, role: newUser.role, name: newUser.name, phone: newUser.phone },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -88,7 +88,7 @@ router.post('/login', async (req, res) => {
         await updateRow(USERS_FILE, 'id', user.id, { lastLogin: new Date().toISOString() });
 
         const token = jwt.sign(
-            { id: user.id, email: user.email, role: user.role, name: user.name },
+            { id: user.id, email: user.email, role: user.role, name: user.name, phone: user.phone },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
