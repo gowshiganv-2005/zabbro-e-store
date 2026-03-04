@@ -5,7 +5,7 @@
  */
 
 require('dotenv').config();
-const { writeExcel, readExcel } = require('./utils/excel');
+const { writeExcel } = require('./utils/excel');
 const bcrypt = require('bcryptjs');
 
 const products = [
@@ -71,69 +71,6 @@ const products = [
         material: 'Aluminum & Leather',
         color: 'Midnight Black',
         tags: 'headphones,wireless,noise-cancelling,electronics'
-    },
-    {
-        id: 'prod_004',
-        name: 'Organic Cotton Throw Blanket',
-        price: 129.00,
-        originalPrice: 159.00,
-        category: 'Home Decor',
-        subcategory: 'Textiles',
-        description: 'Sustainably made from 100% organic cotton. Soft, breathable, and perfect for layering on sofas or beds. Machine washable and hypoallergenic.',
-        image: '/uploads/products/blanket.jpg',
-        images: '/uploads/products/blanket.jpg,/uploads/products/blanket-2.jpg',
-        stock: 60,
-        rating: 4.6,
-        reviewCount: 156,
-        featured: false,
-        bestSeller: true,
-        newArrival: false,
-        brand: 'EcoLiving',
-        material: 'Organic Cotton',
-        color: 'Ivory',
-        tags: 'blanket,organic,cotton,textile,cozy'
-    },
-    {
-        id: 'prod_005',
-        name: 'Modern Desk Lamp',
-        price: 179.00,
-        originalPrice: 219.00,
-        category: 'Lighting',
-        subcategory: 'Desk Lamps',
-        description: 'Sleek LED desk lamp with adjustable color temperature and brightness. Touch-sensitive controls, USB charging port, and a minimal design that complements any workspace.',
-        image: '/uploads/products/lamp.jpg',
-        images: '/uploads/products/lamp.jpg,/uploads/products/lamp-2.jpg',
-        stock: 40,
-        rating: 4.5,
-        reviewCount: 78,
-        featured: true,
-        bestSeller: false,
-        newArrival: true,
-        brand: 'LumiDesign',
-        material: 'Aluminum',
-        color: 'Silver',
-        tags: 'lamp,desk,LED,lighting,modern'
-    },
-    {
-        id: 'prod_006',
-        name: 'Heritage Watch Collection',
-        price: 599.00,
-        originalPrice: 750.00,
-        category: 'Accessories',
-        subcategory: 'Watches',
-        description: 'Classic automatic timepiece with sapphire crystal, exhibition case back, and genuine leather strap. Swiss-made movement with 42-hour power reserve.',
-        image: '/uploads/products/watch.jpg',
-        images: '/uploads/products/watch.jpg,/uploads/products/watch-2.jpg',
-        stock: 15,
-        rating: 4.9,
-        reviewCount: 45,
-        featured: true,
-        bestSeller: false,
-        newArrival: false,
-        brand: 'Meridian',
-        material: 'Stainless Steel',
-        color: 'Rose Gold',
-        tags: 'watch,automatic,heritage,luxury,accessories'
     }
 ];
 
