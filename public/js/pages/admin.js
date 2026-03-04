@@ -228,11 +228,12 @@ function closeModal() { document.getElementById('modal-overlay')?.classList.remo
 
 function openAddProductModal() {
   let uploadedImageUrl = '';
+  let galleryUrls = '';
   openModal(`
     <div class="modal-header"><h3>Add New Product</h3><button class="modal-close" onclick="closeModal()"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Product Image</label>
+        <label class="form-label">Main Product Image</label>
         <div id="img-upload-zone" style="border:2px dashed var(--border);border-radius:var(--radius-md);padding:24px;text-align:center;cursor:pointer;transition:var(--transition);position:relative;min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg-alt)">
           <div id="img-preview-wrap" style="display:none;width:100%;max-width:260px;aspect-ratio:4/5;border-radius:12px;overflow:hidden;margin:0 auto 12px">
             <img id="img-preview" style="width:100%;height:100%;object-fit:cover" />
@@ -257,21 +258,30 @@ function openAddProductModal() {
         <div class="form-group"><label class="form-label">Stock</label><input class="form-input" id="mp-stock" type="number" value="50"></div>
       </div>
       <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="mp-desc"></textarea></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
         <div class="form-group"><label class="form-label">Brand</label><input class="form-input" id="mp-brand" placeholder="e.g. ZABBRO"></div>
         <div class="form-group"><label class="form-label">Material</label><input class="form-input" id="mp-material" placeholder="e.g. Cotton"></div>
         <div class="form-group"><label class="form-label">Color</label><input class="form-input" id="mp-color" placeholder="e.g. Black"></div>
+      </div>
       <div class="form-group">
-        <label class="form-label">Gallery Image URLs (Comma separated)</label>
-        <textarea class="form-input" id="mp-gallery" placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg" style="min-height:60px"></textarea>
-        <p style="font-size:.7rem;color:var(--text-muted);margin-top:4px">Add additional views for the carousel. The main image is already included.</p>
+        <label class="form-label">Additional Gallery Images</label>
+        <div id="gallery-upload-zone" style="border:2px dashed var(--border);border-radius:var(--radius-md);padding:16px;text-align:center;cursor:pointer;background:var(--bg-alt);position:relative;margin-bottom:12px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:4px;color:var(--text-muted)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p style="font-size:.75rem;font-weight:500;color:var(--text-secondary)">Drag additional gallery images here</p>
+          <input type="file" id="gallery-file-input" multiple accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer" />
+        </div>
+        <div id="gallery-preview-list" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;min-height:100px">
+          <div style="display:flex;align-items:center;justify-content:center;width:100%;color:var(--text-muted);font-size:.75rem">No gallery images added yet</div>
+        </div>
+        <div id="gallery-upload-status" style="font-size:.7rem;color:var(--text-muted);margin-top:4px"></div>
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="save-product-btn">Save Product</button></div>
   `);
 
-  // Image upload handler
+  // Image upload handlers
   setupImageUpload('img-file-input', 'img-preview', 'img-preview-wrap', 'img-placeholder', 'img-upload-zone', 'img-upload-status', (url) => { uploadedImageUrl = url; });
+  setupMultiImageUpload('gallery-file-input', 'gallery-upload-zone', 'gallery-preview-list', 'gallery-upload-status', [], (urls) => { galleryUrls = urls; });
 
   document.getElementById('save-product-btn')?.addEventListener('click', async () => {
     const name = document.getElementById('mp-name').value.trim();
@@ -289,7 +299,7 @@ function openAddProductModal() {
         material: document.getElementById('mp-material').value,
         color: document.getElementById('mp-color').value,
         image: uploadedImageUrl,
-        images: (uploadedImageUrl + ',' + document.getElementById('mp-gallery').value).split(',').map(s => s.trim()).filter(s => s).join(','),
+        images: (uploadedImageUrl + ',' + galleryUrls).split(',').map(s => s.trim()).filter(Boolean).join(','),
         featured: false, bestSeller: false, newArrival: true
       });
       Toast.show('Product created!', 'success');
@@ -304,11 +314,12 @@ async function openEditProductModal(id) {
   if (!res.success) return;
   const p = res.data;
   let uploadedImageUrl = p.image || '';
+  let galleryUrls = p.images || '';
   openModal(`
     <div class="modal-header"><h3>Edit Product</h3><button class="modal-close" onclick="closeModal()"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Product Image</label>
+        <label class="form-label">Main Product Image</label>
         <div id="img-upload-zone" style="border:2px dashed var(--border);border-radius:var(--radius-md);padding:24px;text-align:center;cursor:pointer;transition:var(--transition);position:relative;min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg-alt)">
           <div id="img-preview-wrap" style="${p.image ? '' : 'display:none;'}width:100%;max-width:260px;aspect-ratio:4/5;border-radius:12px;overflow:hidden;margin:0 auto 12px">
             <img id="img-preview" src="${p.image || ''}" style="width:100%;height:100%;object-fit:cover" />
@@ -333,21 +344,28 @@ async function openEditProductModal(id) {
         <div class="form-group"><label class="form-label">Stock</label><input class="form-input" id="mp-stock" type="number" value="${p.stock}"></div>
       </div>
       <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="mp-desc">${p.description || ''}</textarea></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
         <div class="form-group"><label class="form-label">Brand</label><input class="form-input" id="mp-brand" value="${p.brand || ''}"></div>
         <div class="form-group"><label class="form-label">Material</label><input class="form-input" id="mp-material" value="${p.material || ''}"></div>
         <div class="form-group"><label class="form-label">Color</label><input class="form-input" id="mp-color" value="${p.color || ''}"></div>
+      </div>
       <div class="form-group">
-        <label class="form-label">Gallery Image URLs (Comma separated)</label>
-        <textarea class="form-input" id="mp-gallery" placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg" style="min-height:60px">${p.images || ''}</textarea>
-        <p style="font-size:.7rem;color:var(--text-muted);margin-top:4px">The main image above is automatically included if not present here.</p>
+        <label class="form-label">Additional Gallery Images</label>
+        <div id="gallery-upload-zone" style="border:2px dashed var(--border);border-radius:var(--radius-md);padding:16px;text-align:center;cursor:pointer;background:var(--bg-alt);position:relative;margin-bottom:12px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:4px;color:var(--text-muted)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p style="font-size:.75rem;font-weight:500;color:var(--text-secondary)">Drag additional gallery images here</p>
+          <input type="file" id="gallery-file-input" multiple accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer" />
+        </div>
+        <div id="gallery-preview-list" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;min-height:100px"></div>
+        <div id="gallery-upload-status" style="font-size:.7rem;color:var(--text-muted);margin-top:4px"></div>
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="update-product-btn">Update</button></div>
   `);
 
-  // Image upload handler
+  // Image upload handlers
   setupImageUpload('img-file-input', 'img-preview', 'img-preview-wrap', 'img-placeholder', 'img-upload-zone', 'img-upload-status', (url) => { uploadedImageUrl = url; });
+  setupMultiImageUpload('gallery-file-input', 'gallery-upload-zone', 'gallery-preview-list', 'gallery-upload-status', p.images || '', (urls) => { galleryUrls = urls; });
 
   document.getElementById('update-product-btn')?.addEventListener('click', async () => {
     try {
@@ -363,7 +381,7 @@ async function openEditProductModal(id) {
         material: document.getElementById('mp-material').value,
         color: document.getElementById('mp-color').value,
         image: uploadedImageUrl,
-        images: document.getElementById('mp-gallery').value.trim() || uploadedImageUrl
+        images: (uploadedImageUrl + ',' + galleryUrls).split(',').map(s => s.trim()).filter(Boolean).join(',')
       });
       Toast.show('Product updated!', 'success');
       closeModal();
@@ -473,3 +491,73 @@ async function deleteUser(id) {
     loadAdminTab('users');
   } catch (e) { Toast.show(e.message || 'Failed to delete user', 'error'); }
 }
+
+/** Multi-image upload handler for gallery */
+function setupMultiImageUpload(inputId, zoneId, listId, statusId, initialUrls = [], onUpdate) {
+  const fileInput = document.getElementById(inputId);
+  const zone = document.getElementById(zoneId);
+  const list = document.getElementById(listId);
+  const status = document.getElementById(statusId);
+  let urls = (typeof initialUrls === 'string' ? initialUrls.split(',') : initialUrls).filter(s => s && s.trim());
+
+  const renderList = () => {
+    if (!list) return;
+    list.innerHTML = urls.map((url, idx) => `
+      <div class="gallery-upload-item" style="position:relative;width:80px;height:100px;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--bg-alt);flex-shrink:0">
+        <img src="${url}" style="width:100%;height:80px;object-fit:cover" />
+        <button type="button" onclick="window._removeGalleryItem('${listId}', ${idx})" style="position:absolute;top:2px;right:2px;background:rgba(255,59,48,0.9);color:white;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.2)">&times;</button>
+        <div style="font-size:10px;text-align:center;padding:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-muted)">Image ${idx + 1}</div>
+      </div>
+    `).join('');
+    onUpdate(urls.join(','));
+  };
+
+  // Attach state to the list element so the global helper can find it
+  list._galleryUrls = urls;
+  list._renderList = renderList;
+
+  renderList();
+
+  if (!fileInput || !zone) return;
+
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; zone.style.background = 'rgba(0,0,0,0.02)'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; zone.style.background = ''; });
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.style.borderColor = ''; zone.style.background = '';
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) handleFiles(fileInput.files);
+  });
+
+  async function handleFiles(files) {
+    status.textContent = `Uploading ${files.length} images...`;
+    status.style.color = 'var(--text-muted)';
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file.type.startsWith('image/')) continue;
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+        const res = await API.admin.uploadImage(formData);
+        if (res.success) {
+          urls.push(res.data.url);
+          renderList();
+        }
+      } catch (e) { console.error('Gallery upload failed:', e); }
+    }
+    status.textContent = '✓ Gallery updated';
+    status.style.color = 'var(--success)';
+  }
+}
+
+// Global helper for gallery item removal
+window._removeGalleryItem = (listId, idx) => {
+  const list = document.getElementById(listId);
+  if (list && list._galleryUrls) {
+    list._galleryUrls.splice(idx, 1);
+    list._renderList();
+  }
+};
