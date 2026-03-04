@@ -120,7 +120,7 @@ async function seed() {
         console.log('✅ Inventory records created');
 
         // Ensure empty sheets for orders and reviews exist with headers
-        await writeExcel('orders.xlsx', [{ id: 'order_template', userId: '', products: '[]', total: 0, status: 'pending', createdAt: '' }]);
+        await writeExcel('orders.xlsx', [{ id: 'order_template', userId: '', userName: '', userEmail: '', userPhone: '', products: '[]', total: 0, status: 'pending', createdAt: '' }]);
         await writeExcel('reviews.xlsx', [{ id: 'review_template', productId: '', userId: '', rating: 5, comment: '', createdAt: '' }]);
 
         console.log('\n🎉 SUCCESS! Your Google Spreadsheet is now persistent and loaded with data.');

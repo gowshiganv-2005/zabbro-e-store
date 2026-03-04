@@ -205,23 +205,32 @@ router.get('/stats/summary', authenticate, async (req, res) => {
 // DELETE /api/orders/:id - Delete order history
 router.delete('/:id', authenticate, async (req, res) => {
     try {
+        console.log(`🗑️ Deletion request for order: ${req.params.id} by user: ${req.user.id} (${req.user.role})`);
+
         const order = await findRow(ORDERS_FILE, 'id', req.params.id);
         if (!order) {
+            console.log(`❌ Order ${req.params.id} not found for deletion`);
             return res.status(404).json({ success: false, message: 'Order not found' });
         }
 
+        console.log(`📋 Order Details - ID: ${order.id}, Owner: ${order.userId}, User: ${order.userName}`);
+
         // Only admin or the order owner can delete
         if (req.user.role !== 'admin' && order.userId !== req.user.id) {
+            console.warn(`⚠️ Unauthorized deletion attempt for order ${order.id} by user ${req.user.id}`);
             return res.status(403).json({ success: false, message: 'Permission denied' });
         }
 
         const deleted = await deleteRow(ORDERS_FILE, 'id', req.params.id);
+        console.log(`✨ deleteRow result for ${req.params.id}: ${deleted}`);
+
         if (deleted) {
             res.json({ success: true, message: 'Order history deleted successfully' });
         } else {
-            res.status(500).json({ success: false, message: 'Failed to delete order' });
+            res.status(500).json({ success: false, message: 'Failed to delete order from spreadsheet' });
         }
     } catch (error) {
+        console.error('🔥 CRITICAL: Delete order error:', error.message);
         res.status(500).json({ success: false, message: 'Error deleting order', error: error.message });
     }
 });

@@ -78,7 +78,11 @@ async function setSheetData(sheetName, data) {
   if (!data || data.length === 0) return true;
 
   try {
-    const headers = Object.keys(data[0]);
+    // Dynamically collect all unique keys from all objects to ensure no data loss
+    const headerSet = new Set();
+    data.forEach(item => Object.keys(item).forEach(key => headerSet.add(key)));
+    const headers = Array.from(headerSet);
+
     const rows = [headers];
     data.forEach(item => {
       rows.push(headers.map(header => {
@@ -88,7 +92,7 @@ async function setSheetData(sheetName, data) {
       }));
     });
 
-    console.log(`📝 Writing ${rows.length} rows to sheet: ${sheetName}`);
+    console.log(`📝 Writing ${rows.length} rows to sheet: ${sheetName}. Columns: ${headers.join(', ')}`);
 
     await sheets.spreadsheets.values.clear({
       spreadsheetId: SPREADSHEET_ID,
