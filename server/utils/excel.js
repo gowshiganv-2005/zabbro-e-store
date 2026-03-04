@@ -14,14 +14,13 @@ if (rawKey.startsWith('"') && rawKey.endsWith('"')) {
 // Clean up escaped newlines (e.g. \\n becomes \n)
 const PRIVATE_KEY = rawKey.replace(/\\n/g, '\n').trim();
 
-// Authentication setup using the modern GoogleAuth
-const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: PRIVATE_KEY,
-  },
-  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
+// Authentication setup using JWT for better reliability
+const auth = new google.auth.JWT(
+  process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  null,
+  PRIVATE_KEY,
+  ['https://www.googleapis.com/auth/spreadsheets']
+);
 
 const sheets = google.sheets({ version: 'v4', auth });
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
@@ -34,6 +33,7 @@ const SHEET_MAP = {
   'reviews.xlsx': 'Reviews'
 };
 
+/** Get data from sheet */
 async function getSheetData(sheetName) {
   if (!SPREADSHEET_ID) return [];
   try {
@@ -49,14 +49,15 @@ async function getSheetData(sheetName) {
       const obj = {};
       headers.forEach((header, index) => {
         let value = row[index];
+        if (value === undefined || value === null) value = '';
         try {
-          if (value && (value.startsWith('[') || value.startsWith('{'))) {
+          if (value && typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
             obj[header] = JSON.parse(value);
           } else if (value === 'TRUE' || value === 'true' || value === true) {
             obj[header] = true;
           } else if (value === 'FALSE' || value === 'false' || value === false) {
             obj[header] = false;
-          } else if (!isNaN(value) && value !== '' && value !== null) {
+          } else if (!isNaN(value) && value !== '' && value !== null && typeof value !== 'boolean') {
             obj[header] = Number(value);
           } else {
             obj[header] = value;
@@ -68,60 +69,39 @@ async function getSheetData(sheetName) {
       return obj;
     });
   } catch (error) {
-    console.error(`Error reading sheet ${sheetName}:`, error.message);
-    return [];
+    console.error(`❌ Sheet Read Error (${sheetName}):`, error.message);
+    throw new Error(`Database unavailable: ${error.message}`);
   }
 }
 
+/** Overwrite sheet data */
 async function setSheetData(sheetName, data) {
   if (!SPREADSHEET_ID) throw new Error('GOOGLE_SPREADSHEET_ID is missing');
 
   try {
-    // If no data, just clear the sheet (keep only headers if possible, or just blank it)
     if (!data || data.length === 0) {
-      console.log(`🧹 Clearing sheet: ${sheetName} (Empty data)`);
-      await sheets.spreadsheets.values.clear({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${sheetName}!A:Z`,
-      });
-      return true;
-    }
-
-    // Dynamically collect all unique keys from all objects to ensure no data loss
-    const headerSet = new Set();
-    data.forEach(item => {
-      if (item && typeof item === 'object') {
-        Object.keys(item).forEach(key => headerSet.add(key));
-      }
-    });
-    const headers = Array.from(headerSet);
-
-    if (headers.length === 0) {
-      console.log(`🧹 Clearing sheet: ${sheetName} (No columns found)`);
       await sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A:Z` });
       return true;
     }
 
-    const rows = [headers];
+    const headerSet = new Set();
     data.forEach(item => {
-      rows.push(headers.map(header => {
-        const val = item[header];
-        if (typeof val === 'object' && val !== null) return JSON.stringify(val);
-        return val === undefined || val === null ? '' : val;
-      }));
+      if (item) Object.keys(item).forEach(key => headerSet.add(key));
     });
+    const headers = Array.from(headerSet);
+    const rows = [headers, ...data.map(item => headers.map(h => {
+      const val = item[h];
+      if (typeof val === 'object' && val !== null) return JSON.stringify(val);
+      return val === undefined || val === null ? '' : val;
+    }))];
 
-    console.log(`📝 Writing ${rows.length} rows to sheet: ${sheetName}. Columns: ${headers.join(', ')}`);
-
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A:Z`,
-    });
+    // Clear whole sheet first to avoid ghost rows from previous longer data
+    await sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${sheetName}!A:Z` });
 
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
       range: `${sheetName}!A1`,
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED', // USER_ENTERED handles numbers/booleans better in Sheets UI
       resource: { values: rows },
     });
     return true;
@@ -131,15 +111,8 @@ async function setSheetData(sheetName, data) {
   }
 }
 
-async function readExcel(filename) {
-  const sheetName = SHEET_MAP[filename];
-  return await getSheetData(sheetName);
-}
-
-async function writeExcel(filename, data) {
-  const sheetName = SHEET_MAP[filename];
-  return await setSheetData(sheetName, data);
-}
+async function readExcel(filename) { return await getSheetData(SHEET_MAP[filename]); }
+async function writeExcel(filename, data) { return await setSheetData(SHEET_MAP[filename], data); }
 
 async function appendRow(filename, row) {
   const currentData = await readExcel(filename);
@@ -149,22 +122,39 @@ async function appendRow(filename, row) {
 
 async function updateRow(filename, matchField, matchValue, updates) {
   const data = await readExcel(filename);
-  const index = data.findIndex(item => String(item[matchField]) === String(matchValue));
-  if (index === -1) return false;
+  const target = String(matchValue).toLowerCase().trim();
+  const index = data.findIndex(item => {
+    const val = item[matchField];
+    return val !== undefined && String(val).toLowerCase().trim() === target;
+  });
+
+  if (index === -1) {
+    console.warn(`⚠️ updateRow failed: No row found in ${filename} where ${matchField} matches "${matchValue}"`);
+    return false;
+  }
   data[index] = { ...data[index], ...updates };
   return await writeExcel(filename, data);
 }
 
 async function deleteRow(filename, matchField, matchValue) {
   const data = await readExcel(filename);
-  const filtered = data.filter(item => String(item[matchField]) !== String(matchValue));
+  const target = String(matchValue).toLowerCase().trim();
+  const filtered = data.filter(item => {
+    const val = item[matchField];
+    return val === undefined || String(val).toLowerCase().trim() !== target;
+  });
+
   if (filtered.length === data.length) return false;
   return await writeExcel(filename, filtered);
 }
 
 async function findRow(filename, matchField, matchValue) {
   const data = await readExcel(filename);
-  return data.find(item => String(item[matchField]) === String(matchValue)) || null;
+  const target = String(matchValue).toLowerCase().trim();
+  return data.find(item => {
+    const val = item[matchField];
+    return val !== undefined && String(val).toLowerCase().trim() === target;
+  }) || null;
 }
 
 async function findRows(filename, matchField, matchValue) {

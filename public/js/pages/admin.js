@@ -368,7 +368,12 @@ async function openEditProductModal(id) {
   setupMultiImageUpload('gallery-file-input', 'gallery-upload-zone', 'gallery-preview-list', 'gallery-upload-status', p.images || '', (urls) => { galleryUrls = urls; });
 
   document.getElementById('update-product-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('update-product-btn');
+    const originalText = btn.textContent;
     try {
+      btn.disabled = true;
+      btn.textContent = 'Updating...';
+
       await API.products.update(id, {
         name: document.getElementById('mp-name').value,
         price: parseFloat(document.getElementById('mp-price').value),
@@ -386,7 +391,11 @@ async function openEditProductModal(id) {
       Toast.show('Product updated!', 'success');
       closeModal();
       loadAdminTab('products');
-    } catch (e) { Toast.show(e.message, 'error'); }
+    } catch (e) {
+      Toast.show(e.message, 'error');
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   });
 }
 
