@@ -146,13 +146,16 @@ async function setSheetData(sheetName, data) {
       return strVal;
     }))];
 
-    // Atomic full update: Clear previous content implicitly by updating the necessary range
+    // Atomic full update
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
       range: `${sheetName}!A1`,
       valueInputOption: 'USER_ENTERED',
       resource: { values: rows },
     });
+
+    // ✨ Cache Invalidation
+    dataCache.delete(sheetName);
 
     releaseLock(filename);
     return true;
@@ -195,7 +198,6 @@ async function appendRow(filename, row) {
     });
     const headers = Array.from(headerSet);
 
-    // If new columns were added, update the header row first to prevent mapping errors
     if (hasNewHeaders && existingHeaders.length > 0) {
       console.log(`✨ Expanding columns for ${sheetName}...`);
       await syncHeaders(sheetName, headers);
@@ -209,28 +211,27 @@ async function appendRow(filename, row) {
       return strVal;
     });
 
-    try {
-      if (existingHeaders.length === 0) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${sheetName}!A1`,
-          valueInputOption: 'USER_ENTERED',
-          resource: { values: [headers, rowArray] },
-        });
-      } else {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: SPREADSHEET_ID,
-          range: `${sheetName}!A1`,
-          valueInputOption: 'USER_ENTERED',
-          resource: { values: [rowArray] },
-        });
-      }
-      releaseLock(filename);
-      return true;
-    } catch (apiError) {
-      console.error(`❌ Append API error for ${sheetName}:`, apiError.message);
-      throw apiError;
+    if (existingHeaders.length === 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A1`,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [headers, rowArray] },
+      });
+    } else {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A1`,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [rowArray] },
+      });
     }
+
+    // ✨ Cache Invalidation after append
+    dataCache.delete(sheetName);
+
+    releaseLock(filename);
+    return true;
   } catch (error) {
     console.error(`❌ Atomic Append Error in ${sheetName}:`, error.message);
     releaseLock(filename);
@@ -273,6 +274,10 @@ async function updateRow(filename, matchField, matchValue, updates) {
       valueInputOption: 'USER_ENTERED',
       resource: { values: [rowArray] },
     });
+
+    // ✨ Cache Invalidation
+    dataCache.delete(sheetName);
+
     releaseLock(filename);
     return true;
   } catch (error) {
@@ -298,8 +303,6 @@ async function deleteRow(filename, matchField, matchValue) {
       return false;
     }
 
-    // We must use writeExcel logic here, which will re-acquire lock if not careful.
-    // Let's call the sheets API directly since we have the lock.
     const headerSet = new Set();
     filtered.forEach(item => { if (item) Object.keys(item).forEach(key => headerSet.add(key)); });
     const headers = Array.from(headerSet);
@@ -316,11 +319,13 @@ async function deleteRow(filename, matchField, matchValue) {
       resource: { values: rows },
     });
 
-    // Clear remaining rows if we deleted data
     await sheets.spreadsheets.values.clear({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A${rows.length + 1}:Z${rows.length + 100}`,
+      range: `${sheetName}!A${rows.length + 1}:Z${rows.length + 500}`, // Increased range for safety
     });
+
+    // ✨ Cache Invalidation
+    dataCache.delete(sheetName);
 
     releaseLock(filename);
     return true;
@@ -333,6 +338,7 @@ async function deleteRow(filename, matchField, matchValue) {
 
 async function findRow(filename, matchField, matchValue) {
   const data = await readExcel(filename);
+  if (!data) return null;
   const target = String(matchValue).toLowerCase().trim();
   return data.find(item => {
     const val = item[matchField];
@@ -342,7 +348,12 @@ async function findRow(filename, matchField, matchValue) {
 
 async function findRows(filename, matchField, matchValue) {
   const data = await readExcel(filename);
-  return data.filter(item => String(item[matchField]) === String(matchValue));
+  if (!data) return [];
+  const target = String(matchValue).toLowerCase().trim();
+  return data.filter(item => {
+    const val = item[matchField];
+    return val !== undefined && String(val).toLowerCase().trim() === target;
+  });
 }
 
 module.exports = {
