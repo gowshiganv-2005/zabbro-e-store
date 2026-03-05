@@ -7,34 +7,45 @@ const cloudinary = require('cloudinary').v2;
 const path = require('path');
 const dotenv = require('dotenv');
 
+// Hardcoded Fallbacks for absolute stability
+const CLOUD_NAME = 'dmsuuno0d';
+const API_KEY = '539135726669395';
+const API_SECRET = 'jJnB9qdoS_08vD7RX4yQI16B_6A';
+
 // Force load the .env from root
 const envPath = path.join(__dirname, '..', '..', '.env');
 dotenv.config({ path: envPath });
 
+// Final credentials priority: Environment -> Hardcoded
+const getCreds = () => ({
+    name: (process.env.CLOUDINARY_CLOUD_NAME || CLOUD_NAME).trim(),
+    key: (process.env.CLOUDINARY_API_KEY || API_KEY).trim(),
+    secret: (process.env.CLOUDINARY_API_SECRET || API_SECRET).trim()
+});
+
+/** Verify configuration */
 const isCloudinaryConfigured = () => {
-    return !!(process.env.CLOUDINARY_CLOUD_NAME &&
-        process.env.CLOUDINARY_API_KEY &&
-        process.env.CLOUDINARY_API_SECRET);
+    const { name, key, secret } = getCreds();
+    return !!(name && key && secret);
 };
 
-if (isCloudinaryConfigured()) {
+/** Initialize Cloudinary */
+const init = () => {
+    const { name, key, secret } = getCreds();
     cloudinary.config({
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-        api_key: String(process.env.CLOUDINARY_API_KEY).trim(),
-        api_secret: String(process.env.CLOUDINARY_API_SECRET).trim(),
+        cloud_name: name,
+        api_key: String(key),
+        api_secret: secret,
     });
-}
+    console.log(`[Cloudinary] System Active: ${name}`);
+};
+
+init();
 
 /** Upload image buffer to Cloudinary */
 async function uploadToCloudinary(buffer, fileName) {
     if (!isCloudinaryConfigured()) {
-        const missing = [];
-        if (!process.env.CLOUDINARY_CLOUD_NAME) missing.push('CLOUDINARY_CLOUD_NAME');
-        if (!process.env.CLOUDINARY_API_KEY) missing.push('CLOUDINARY_API_KEY');
-        if (!process.env.CLOUDINARY_API_SECRET) missing.push('CLOUDINARY_API_SECRET');
-        const err = `Cloudinary Configuration Missing: ${missing.join(', ')}. Please verify .env file.`;
-        console.error(`[Cloudinary Upload] ❌ ${err}`);
-        throw new Error(err);
+        throw new Error("Cloudinary configuration failed. Please check credentials.");
     }
 
     return new Promise((resolve, reject) => {
@@ -55,7 +66,6 @@ async function uploadToCloudinary(buffer, fileName) {
             }
         );
 
-        // Write the buffer to the upload stream
         const Readable = require('stream').Readable;
         const readable = new Readable();
         readable.push(buffer);

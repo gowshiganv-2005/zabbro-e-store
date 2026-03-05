@@ -9,6 +9,13 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 
+console.log('=========================================');
+console.log('🚀 SERVER STARTING - CLOUDINARY CONFIG CHECK');
+console.log('CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME ? '✅ FOUND' : '❌ MISSING');
+console.log('CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY ? '✅ FOUND' : '❌ MISSING');
+console.log('CLOUDINARY_API_SECRET:', process.env.CLOUDINARY_API_SECRET ? '✅ FOUND' : '❌ MISSING');
+console.log('=========================================');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -18,6 +25,22 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+app.get('/api/debug-env', (req, res) => {
+    res.json({
+        cloudinary: {
+            name: process.env.CLOUDINARY_CLOUD_NAME ? 'OK' : 'MISSING',
+            key: process.env.CLOUDINARY_API_KEY ? 'OK' : 'MISSING',
+            secret: process.env.CLOUDINARY_API_SECRET ? 'OK' : 'MISSING'
+        },
+        sheets: {
+            id: process.env.GOOGLE_SPREADSHEET_ID ? 'OK' : 'MISSING',
+            email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'OK' : 'MISSING'
+        },
+        cwd: process.cwd(),
+        uptime: process.uptime()
+    });
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname, '..', 'public')));
