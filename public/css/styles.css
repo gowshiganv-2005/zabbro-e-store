@@ -570,11 +570,17 @@ hr {
 @media (max-width: 576px) {
   .notification-dropdown {
     position: fixed;
-    top: 72px;
-    left: 12px;
-    right: 12px;
-    width: auto;
-    right: 12px;
+    top: 60px;
+    /* Aligned with mobile header height */
+    left: 50%;
+    right: auto;
+    width: 92%;
+    max-width: 360px;
+    transform: translateX(-50%) translateY(10px);
+  }
+
+  .notification-dropdown.open {
+    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -3113,6 +3119,11 @@ hr {
 
   .mobile-menu-btn {
     display: flex
+  }
+
+  .header-actions {
+    gap: 8px;
+    /* Slightly more gap for better touch targets */
   }
 
   .hero-title {
