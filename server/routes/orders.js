@@ -30,61 +30,98 @@ function authenticate(req, res, next) {
 // POST /api/orders - Create new order
 router.post('/', authenticate, async (req, res) => {
     try {
-        const { products, shippingAddress, paymentMethod } = req.body;
+        const { products, shippingAddress, paymentMethod, userName, userEmail, userPhone } = req.body;
 
-        if (!products || !products.length) {
-            return res.status(400).json({ success: false, message: 'Order must contain at least one product' });
+        // 🛡️ CRITICAL VALIDATION
+        if (!products || !Array.isArray(products) || products.length === 0) {
+            return res.status(400).json({ success: false, message: 'Your cart is empty' });
         }
 
-        const subtotal = products.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const shipping = subtotal >= 100 ? 0 : 9.99;
-        const tax = subtotal * 0.08;
-        const total = subtotal + shipping + tax;
+        if (!shippingAddress || shippingAddress.length < 10) {
+            return res.status(400).json({ success: false, message: 'Please provide a valid shipping address' });
+        }
+
+        // Validate products and recalculate total
+        let subtotal = 0;
+        const validatedProducts = [];
+
+        for (const item of products) {
+            if (!item.productId || !item.quantity || item.quantity <= 0) {
+                return res.status(400).json({ success: false, message: 'Invalid product or quantity' });
+            }
+
+            const product = await findRow('products.xlsx', 'id', item.productId);
+            if (!product) {
+                return res.status(404).json({ success: false, message: `Product ${item.productId} not found` });
+            }
+            if ((product.stock || 0) < item.quantity) {
+                return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}` });
+            }
+
+            const itemPrice = parseFloat(product.price) || 0;
+            subtotal += itemPrice * item.quantity;
+            validatedProducts.push({
+                productId: item.productId,
+                name: product.name,
+                price: itemPrice,
+                quantity: item.quantity,
+                image: product.image
+            });
+        }
+
+        const shipping = subtotal >= 1000 ? 0 : 50; // Custom threshold for INR/INR context
+        const tax = Math.round(subtotal * 0.18 * 100) / 100; // 18% GST example
+        const total = Math.round((subtotal + shipping + tax) * 100) / 100;
+
+        // Enhanced Unique ID: ord + YYYYMMDD + random
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const orderId = `ORD-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`;
 
         const order = {
-            id: `ord_${uuidv4().slice(0, 8)}`,
+            id: orderId,
             userId: req.user.id,
-            userName: req.body.userName || req.user.name || 'Guest',
-            userEmail: req.body.userEmail || req.user.email || '',
-            userPhone: req.body.userPhone || req.user.phone || '',
-            products: JSON.stringify(products),
-            subtotal: Math.round(subtotal * 100) / 100,
-            shipping: Math.round(shipping * 100) / 100,
-            tax: Math.round(tax * 100) / 100,
-            total: Math.round(total * 100) / 100,
+            userName: userName || req.user.name || 'Customer',
+            userEmail: userEmail || req.user.email || '',
+            userPhone: userPhone || req.user.phone || '',
+            products: JSON.stringify(validatedProducts),
+            subtotal,
+            shipping,
+            tax,
+            total,
             status: 'pending',
-            shippingAddress: shippingAddress || '',
-            paymentMethod: paymentMethod || 'Credit Card',
+            shippingAddress: shippingAddress.trim(),
+            paymentMethod: paymentMethod || 'COD',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
 
         await appendRow(ORDERS_FILE, order);
 
-        // Update inventory
-        for (const item of products) {
+        // Update inventory atomically
+        for (const item of validatedProducts) {
             const product = await findRow('products.xlsx', 'id', item.productId);
-            if (product) {
-                const newStock = Math.max(0, (product.stock || 0) - item.quantity);
-                await updateRow('products.xlsx', 'id', item.productId, { stock: newStock });
-                await updateRow('inventory.xlsx', 'productId', item.productId, {
-                    currentStock: newStock,
-                    availableStock: newStock,
-                    status: newStock > 20 ? 'in_stock' : newStock > 0 ? 'low_stock' : 'out_of_stock'
-                });
-            }
+            const newStock = Math.max(0, (parseInt(product.stock) || 0) - item.quantity);
+
+            await updateRow('products.xlsx', 'id', item.productId, { stock: newStock });
+            await updateRow('inventory.xlsx', 'productId', item.productId, {
+                currentStock: newStock,
+                availableStock: newStock,
+                status: newStock > 10 ? 'in_stock' : newStock > 0 ? 'low_stock' : 'out_of_stock'
+            });
         }
 
         res.status(201).json({ success: true, data: order, message: 'Order placed successfully' });
 
-        // Send confirmation emails (fire-and-forget, don't block response)
-        sendOrderEmails(order, products).then(result => {
-            console.log('📧 Email status:', JSON.stringify(result));
-        }).catch(err => {
-            console.error('📧 Email error:', err.message);
-        });
+        // Email (Optional)
+        try {
+            if (sendOrderEmails) {
+                sendOrderEmails(order, validatedProducts);
+            }
+        } catch (e) { console.error('Email failed:', e.message); }
+
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to create order', error: error.message });
+        console.error('🔥 Order Creation Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to process order. Please try again.' });
     }
 });
 

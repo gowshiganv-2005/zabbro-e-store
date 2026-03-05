@@ -24,6 +24,7 @@ server/migrate-to-drive.js
 server/check-data.js
 server/debug-sheets.js
 server/final-check.js
+server/test-order-flow.js
 
 # Logs
 *.log

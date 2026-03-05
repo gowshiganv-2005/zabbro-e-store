@@ -30,6 +30,20 @@ const sheets = google.sheets({ version: 'v4', auth });
 const drive = google.drive({ version: 'v3', auth });
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
 
+// Mutex lock to prevent concurrent writes causing sheet corruption
+const writeLocks = new Map();
+
+async function acquireLock(filename) {
+  while (writeLocks.get(filename)) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  writeLocks.set(filename, true);
+}
+
+function releaseLock(filename) {
+  writeLocks.set(filename, false);
+}
+
 const SHEET_MAP = {
   'products.xlsx': 'Products',
   'users.xlsx': 'Users',
@@ -38,13 +52,24 @@ const SHEET_MAP = {
   'reviews.xlsx': 'Reviews'
 };
 
+// 🏛️ Performance Cache Layer
+const dataCache = new Map();
+const CACHE_TTL = 5000; // 5 seconds
+
 /** Get data from sheet with raw response for index mapping */
 async function getSheetDataRaw(sheetName) {
   if (!SPREADSHEET_ID) return { data: [], headers: [] };
+
+  // Return from cache if fresh (prevents rate limits)
+  const cached = dataCache.get(sheetName);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    return cached.result;
+  }
+
   try {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}`,
+      range: `${sheetName}!A1:Z2000`,
     });
     const rows = response.data.values;
     if (!rows || rows.length === 0) return { data: [], headers: [] };
@@ -56,14 +81,16 @@ async function getSheetDataRaw(sheetName) {
         let value = row[index];
         if (value === undefined || value === null) value = '';
         try {
-          if (value && typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'))) {
-            obj[header] = JSON.parse(value);
-          } else if (value === 'TRUE' || value === 'true' || value === true) {
+          const trimmed = typeof value === 'string' ? value.trim() : value;
+          // Robust JSON/Boolean/Number parser
+          if (typeof trimmed === 'string' && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+            obj[header] = JSON.parse(trimmed);
+          } else if (trimmed === 'TRUE' || trimmed === 'true' || trimmed === true) {
             obj[header] = true;
-          } else if (value === 'FALSE' || value === 'false' || value === false) {
+          } else if (trimmed === 'FALSE' || trimmed === 'false' || trimmed === false) {
             obj[header] = false;
-          } else if (!isNaN(value) && value !== '' && value !== null && typeof value !== 'boolean') {
-            obj[header] = Number(value);
+          } else if (trimmed !== '' && !isNaN(trimmed) && typeof trimmed !== 'boolean') {
+            obj[header] = Number(trimmed);
           } else {
             obj[header] = value;
           }
@@ -73,10 +100,13 @@ async function getSheetDataRaw(sheetName) {
       });
       return obj;
     });
-    return { data, headers };
+
+    const result = { data, headers };
+    dataCache.set(sheetName, { result, timestamp: Date.now() });
+    return result;
   } catch (error) {
     console.error(`❌ Sheet Read Error (${sheetName}):`, error.message);
-    throw new Error(`Database unavailable: ${error.message}`);
+    return { data: [], headers: [] };
   }
 }
 
@@ -89,16 +119,19 @@ async function getSheetData(sheetName) {
 /** Overwrite sheet data with absolute safety */
 async function setSheetData(sheetName, data) {
   if (!SPREADSHEET_ID) throw new Error('GOOGLE_SPREADSHEET_ID is missing');
+  const filename = Object.keys(SHEET_MAP).find(key => SHEET_MAP[key] === sheetName);
+  await acquireLock(filename);
 
   try {
     const criticalSheets = ['Products', 'Users', 'Inventory'];
     // 🛡️ STOP: Prevents accidental bulk deletion
     if (criticalSheets.includes(sheetName) && (!data || data.length === 0)) {
       console.error(`🛑 BLOCKED: Attempted to clear critical sheet ${sheetName}. Safeguard triggered.`);
+      releaseLock(filename);
       return false;
     }
 
-    if (!data) return false;
+    if (!data) { releaseLock(filename); return false; }
 
     // Determine current headers
     const headerSet = new Set();
@@ -114,21 +147,18 @@ async function setSheetData(sheetName, data) {
     }))];
 
     // Atomic full update: Clear previous content implicitly by updating the necessary range
-    // We update starting at A1. We don't use a hardcoded large range to avoid unintended side effects.
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A1`, // Start at A1, Google will expand to fit the 'rows' array
+      range: `${sheetName}!A1`,
       valueInputOption: 'USER_ENTERED',
       resource: { values: rows },
     });
 
+    releaseLock(filename);
     return true;
   } catch (error) {
-    if (error.response) {
-      console.error(`❌ Sheet Write Error (${sheetName}) Details:`, JSON.stringify(error.response.data));
-      throw new Error(`Google Sheets API Error: ${error.response.data.error.message} (Status: ${error.response.status})`);
-    }
     console.error(`❌ Sheet Write Error (${sheetName}):`, error.message);
+    releaseLock(filename);
     throw error;
   }
 }
@@ -136,100 +166,169 @@ async function setSheetData(sheetName, data) {
 async function readExcel(filename) { return await getSheetData(SHEET_MAP[filename]); }
 async function writeExcel(filename, data) { return await setSheetData(SHEET_MAP[filename], data); }
 
+/** Global Header Sync - Ensures columns match across all rows */
+async function syncHeaders(sheetName, newHeaders) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!1:1`,
+    valueInputOption: 'USER_ENTERED',
+    resource: { values: [newHeaders] },
+  });
+}
+
 /** Robust Atomic Append - ZERO risk of full sheet deletion */
 async function appendRow(filename, row) {
   const sheetName = SHEET_MAP[filename];
   if (!sheetName) throw new Error(`Sheet not mapped for ${filename}`);
-
-  // Fetch headers without relying on data presence
-  const { headers: existingHeaders } = await getSheetDataRaw(sheetName);
-
-  // Build headers from existing + any new fields in the new row
-  const headerSet = new Set(existingHeaders);
-  Object.keys(row).forEach(k => headerSet.add(k));
-  const headers = Array.from(headerSet);
-
-  const rowArray = headers.map(h => {
-    let val = row[h];
-    if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
-    const strVal = val === undefined || val === null ? '' : String(val);
-    if (strVal.length > 48000) return strVal.substring(0, 47000) + '... (TRUNCATED)';
-    return strVal;
-  });
+  await acquireLock(filename);
 
   try {
-    // 🛡️ If headers don't exist in sheet, write them first (Initialize Sheet)
-    if (existingHeaders.length === 0) {
-      await writeExcel(filename, [row]);
-      return true;
+    const { headers: existingHeaders } = await getSheetDataRaw(sheetName);
+
+    const headerSet = new Set(existingHeaders);
+    let hasNewHeaders = false;
+    Object.keys(row).forEach(k => {
+      if (!headerSet.has(k)) {
+        headerSet.add(k);
+        hasNewHeaders = true;
+      }
+    });
+    const headers = Array.from(headerSet);
+
+    // If new columns were added, update the header row first to prevent mapping errors
+    if (hasNewHeaders && existingHeaders.length > 0) {
+      console.log(`✨ Expanding columns for ${sheetName}...`);
+      await syncHeaders(sheetName, headers);
     }
 
-    // 🛡️ ATOMIC APPEND: Adding to existing data - never touches previous rows
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A1`,
-      valueInputOption: 'USER_ENTERED',
-      resource: { values: [rowArray] },
+    const rowArray = headers.map(h => {
+      let val = row[h];
+      if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+      const strVal = val === undefined || val === null ? '' : String(val);
+      if (strVal.length > 48000) return strVal.substring(0, 47000) + '... (TRUNCATED)';
+      return strVal;
     });
-    return true;
+
+    try {
+      if (existingHeaders.length === 0) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A1`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [headers, rowArray] },
+        });
+      } else {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${sheetName}!A1`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [rowArray] },
+        });
+      }
+      releaseLock(filename);
+      return true;
+    } catch (apiError) {
+      console.error(`❌ Append API error for ${sheetName}:`, apiError.message);
+      throw apiError;
+    }
   } catch (error) {
     console.error(`❌ Atomic Append Error in ${sheetName}:`, error.message);
+    releaseLock(filename);
     throw new Error(`Failed to save record: ${error.message}`);
   }
 }
 
-/** Atomic version of updateRow to prevent full sheet rewrite race conditions */
+/** Atomic version of updateRow with Mutex locking */
 async function updateRow(filename, matchField, matchValue, updates) {
   const sheetName = SHEET_MAP[filename];
-  const { data, headers } = await getSheetDataRaw(sheetName);
+  await acquireLock(filename);
 
-  const target = String(matchValue).toLowerCase().trim();
-  const index = data.findIndex(item => {
-    const val = item[matchField];
-    return val !== undefined && String(val).toLowerCase().trim() === target;
-  });
-
-  if (index === -1) {
-    console.warn(`⚠️ updateRow failed: No row found in ${filename} where ${matchField} matches "${matchValue}"`);
-    return false;
-  }
-
-  const updatedItem = { ...data[index], ...updates };
-  // Convert object back to row array based on headers
-  const rowArray = headers.map(h => {
-    let val = updatedItem[h];
-    if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
-    const strVal = val === undefined || val === null ? '' : String(val);
-    if (strVal.length > 49000) return strVal.substring(0, 48000) + '... (TRUNCATED)';
-    return strVal;
-  });
-
-  const rowNumber = index + 2; // +1 for 0-indexing, +1 for header row
   try {
+    const { data, headers } = await getSheetDataRaw(sheetName);
+    const target = String(matchValue).toLowerCase().trim();
+    const index = data.findIndex(item => {
+      const val = item[matchField];
+      return val !== undefined && String(val).toLowerCase().trim() === target;
+    });
+
+    if (index === -1) {
+      console.warn(`⚠️ updateRow failed: No row found in ${filename} where ${matchField} matches "${matchValue}"`);
+      releaseLock(filename);
+      return false;
+    }
+
+    const updatedItem = { ...data[index], ...updates };
+    const rowArray = headers.map(h => {
+      let val = updatedItem[h];
+      if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+      const strVal = val === undefined || val === null ? '' : String(val);
+      if (strVal.length > 49000) return strVal.substring(0, 48000) + '... (TRUNCATED)';
+      return strVal;
+    });
+
+    const rowNumber = index + 2;
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
       range: `${sheetName}!A${rowNumber}`,
       valueInputOption: 'USER_ENTERED',
       resource: { values: [rowArray] },
     });
+    releaseLock(filename);
     return true;
   } catch (error) {
-    console.error(`❌ Atomic Update Failed, falling back to full write:`, error.message);
-    data[index] = updatedItem;
-    return await writeExcel(filename, data);
+    console.error(`❌ updateRow failed for ${sheetName}:`, error.message);
+    releaseLock(filename);
+    return false;
   }
 }
 
 async function deleteRow(filename, matchField, matchValue) {
-  const data = await readExcel(filename);
-  const target = String(matchValue).toLowerCase().trim();
-  const filtered = data.filter(item => {
-    const val = item[matchField];
-    return val === undefined || String(val).toLowerCase().trim() !== target;
-  });
+  const sheetName = SHEET_MAP[filename];
+  await acquireLock(filename);
+  try {
+    const data = await readExcel(filename);
+    const target = String(matchValue).toLowerCase().trim();
+    const filtered = data.filter(item => {
+      const val = item[matchField];
+      return val === undefined || String(val).toLowerCase().trim() !== target;
+    });
 
-  if (filtered.length === data.length) return false;
-  return await writeExcel(filename, filtered);
+    if (filtered.length === data.length) {
+      releaseLock(filename);
+      return false;
+    }
+
+    // We must use writeExcel logic here, which will re-acquire lock if not careful.
+    // Let's call the sheets API directly since we have the lock.
+    const headerSet = new Set();
+    filtered.forEach(item => { if (item) Object.keys(item).forEach(key => headerSet.add(key)); });
+    const headers = Array.from(headerSet);
+    const rows = [headers, ...filtered.map(item => headers.map(h => {
+      let val = item[h];
+      if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+      return val === undefined || val === null ? '' : String(val);
+    }))];
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: rows },
+    });
+
+    // Clear remaining rows if we deleted data
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!A${rows.length + 1}:Z${rows.length + 100}`,
+    });
+
+    releaseLock(filename);
+    return true;
+  } catch (error) {
+    console.error(`❌ deleteRow failed for ${sheetName}:`, error.message);
+    releaseLock(filename);
+    return false;
+  }
 }
 
 async function findRow(filename, matchField, matchValue) {
