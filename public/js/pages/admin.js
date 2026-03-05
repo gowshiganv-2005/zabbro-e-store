@@ -182,7 +182,7 @@ async function loadInventoryTab(el) {
           <td>${i.currentStock}</td>
           <td>${i.availableStock}</td>
           <td>${i.reorderLevel}</td>
-          <td><span class="status-badge status-${i.status}">${(i.status || '').replace('_', ' ')}</span></td>
+          <td><span class="status-badge status-${i.status}">${String(i.status || '').replace('_', ' ')}</span></td>
           <td><button class="btn btn-sm btn-ghost" onclick="openInventoryModal('${i.productId}',${i.currentStock},${i.reorderLevel})">Update</button></td>
         </tr>`).join('')}
         </tbody></table>

@@ -205,7 +205,7 @@ function renderProductCard(product, index = 0) {
             ${isBest ? '<span class="badge badge-best">Best Seller</span>' : ''}
           </div>
           <div class="product-card-quick-add">
-            <button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault();event.stopPropagation();Store.addToCart({id:'${product.id}',name:'${product.name.replace(/'/g, "\\'")}',price:${product.price},image:'${product.image || ''}',category:'${product.category}'})">
+            <button class="btn btn-primary btn-full btn-sm" onclick="event.preventDefault();event.stopPropagation();Store.addToCart({id:'${product.id}',name:'${String(product.name || '').replace(/'/g, "\\'")}',price:${product.price},image:'${product.image || ''}',category:'${product.category}'})">
               Add to Bag
             </button>
           </div>
