@@ -76,11 +76,11 @@ function renderAboutPage() {
             </div>
             <div style="margin-bottom:32px">
               <h3 style="font-size:1.125rem;margin-bottom:12px">Our HQ</h3>
-              <p style="color:var(--text-secondary)">Premium Block, 5th Floor<br>Lifestyle Tech Park<br>Mumbai, India 400001</p>
+              <p style="color:var(--text-secondary)">2/78G, ayyar Bunglow<br>kulamankulam Main Road<br>madurai, India 625017</p>
             </div>
             <div>
               <h3 style="font-size:1.125rem;margin-bottom:12px">Direct Contact</h3>
-              <p style="color:var(--text-secondary)">Email: support@zabbro.com<br>Phone: +91 93630 36171</p>
+              <p style="color:var(--text-secondary)">Email: support@zabbro.com<br>Phone: +91 9025361098 / +91 8248957918</p>
             </div>
           </div>
           <div class="contact-form-wrap" style="background:var(--white);padding:40px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md)">
